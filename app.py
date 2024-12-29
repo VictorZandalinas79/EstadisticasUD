@@ -295,8 +295,17 @@ def get_color_scale(value):
 # Layout principal
 app.layout = html.Div([
     dbc.Container([
+        # Añadir el escudo
+        html.Img(
+            src='/assets/escudo.png',
+            style={
+                'height': '100px',  # Ajusta el tamaño según necesites
+                'display': 'block',
+                'margin': 'auto',
+                'marginBottom': '20px'
+            }
+        ),
         html.H1("UD Atzeneta Analytics", className="text-center my-4"),
-        html.H2("Evolución KPI por Jornada - temp 24/25", className="text-center mb-4"),
         
         # Tarjeta informativa
         dbc.Card([
