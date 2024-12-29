@@ -52,6 +52,7 @@ def get_all_matches_data():
             idcode,
             idgroup,
             idtext,
+            descripcion,
             CASE 
                 WHEN SUBSTRING(`match`, 1, 1) = 'J' THEN 'Liga'
                 WHEN SUBSTRING(`match`, 1, 1) = 'C' THEN 'Copa'
@@ -65,65 +66,91 @@ def get_all_matches_data():
     ),
     BallPossession AS (
         SELECT 
-            `match`,
-            fecha_parsed,
-            fecha_original,
-            match_type,
-            match_number,
+            ms.`match`,
+            ms.fecha_parsed,
+            ms.fecha_original,
+            ms.match_type,
+            ms.match_number,
+            MAX(ms.descripcion) as descripcion,
             -- BLP (Balón Largo Propio)
-            COUNT(CASE WHEN idcode = 'Tras balon largo propio' 
-                      AND idgroup = '2ª jugada'
-                      AND idtext = 'Ganada'
-                      AND team = 'UD Atzeneta' THEN 1 END) as won_balls_blp,
-            COUNT(CASE WHEN idcode = 'Tras balon largo propio'
-                      AND idgroup = '2ª jugada'
-                      AND idtext = 'Perdida'
-                      AND team = 'UD Atzeneta' THEN 1 END) as lost_balls_blp,
-            COUNT(CASE WHEN idcode = 'Tras balon largo propio'
-                      AND idgroup = '2ª jugada'
-                      AND team = 'UD Atzeneta' THEN 1 END) as total_balls_blp,
+            COUNT(CASE WHEN ms.idcode = 'Tras balon largo propio' 
+                      AND ms.idgroup = '2ª jugada'
+                      AND ms.idtext = 'Ganada'
+                      AND ms.team = 'UD Atzeneta' THEN 1 END) as won_balls_blp,
+            COUNT(CASE WHEN ms.idcode = 'Tras balon largo propio'
+                      AND ms.idgroup = '2ª jugada'
+                      AND ms.idtext = 'Perdida'
+                      AND ms.team = 'UD Atzeneta' THEN 1 END) as lost_balls_blp,
+            COUNT(CASE WHEN ms.idcode = 'Tras balon largo propio'
+                      AND ms.idgroup = '2ª jugada'
+                      AND ms.team = 'UD Atzeneta' THEN 1 END) as total_balls_blp,
             -- BLR (Balón Largo Rival)
-            COUNT(CASE WHEN idcode = 'Tras balon largo rival' 
-                      AND idgroup = '2ª jugada'
-                      AND idtext = 'Ganada'
-                      AND team != 'UD Atzeneta' THEN 1 END) as won_balls_blr,
-            COUNT(CASE WHEN idcode = 'Tras balon largo rival'
-                      AND idgroup = '2ª jugada'
-                      AND idtext = 'Perdida'
-                      AND team != 'UD Atzeneta' THEN 1 END) as lost_balls_blr,
-            COUNT(CASE WHEN idcode = 'Tras balon largo rival'
-                      AND idgroup = '2ª jugada'
-                      AND team != 'UD Atzeneta' THEN 1 END) as total_balls_blr,
+            COUNT(CASE WHEN ms.idcode = 'Tras balon largo rival' 
+                      AND ms.idgroup = '2ª jugada'
+                      AND ms.idtext = 'Ganada'
+                      AND ms.team != 'UD Atzeneta' THEN 1 END) as won_balls_blr,
+            COUNT(CASE WHEN ms.idcode = 'Tras balon largo rival'
+                      AND ms.idgroup = '2ª jugada'
+                      AND ms.idtext = 'Perdida'
+                      AND ms.team != 'UD Atzeneta' THEN 1 END) as lost_balls_blr,
+            COUNT(CASE WHEN ms.idcode = 'Tras balon largo rival'
+                      AND ms.idgroup = '2ª jugada'
+                      AND ms.team != 'UD Atzeneta' THEN 1 END) as total_balls_blr,
             -- PTP (Presión Tras Pérdida)
-            COUNT(CASE WHEN idcode = 'Presión tras perdida' 
-                      AND idgroup = 'Presión conjunta'
-                      AND idtext = 'Si'
-                      AND team = 'UD Atzeneta' THEN 1 END) as success_ptp,
-            COUNT(CASE WHEN idcode = 'Presión tras perdida'
-                      AND idgroup = 'Presión conjunta'
-                      AND idtext = 'No'
-                      AND team = 'UD Atzeneta' THEN 1 END) as fail_ptp,
-            COUNT(CASE WHEN idcode = 'Presión tras perdida'
-                      AND idgroup = 'Presión conjunta'
-                      AND team = 'UD Atzeneta' THEN 1 END) as total_ptp,
+            COUNT(CASE WHEN ms.idcode = 'Presión tras perdida' 
+                      AND ms.idgroup = 'Presión conjunta'
+                      AND ms.idtext = 'Si'
+                      AND ms.team = 'UD Atzeneta' THEN 1 END) as success_ptp,
+            COUNT(CASE WHEN ms.idcode = 'Presión tras perdida'
+                      AND ms.idgroup = 'Presión conjunta'
+                      AND ms.idtext = 'No'
+                      AND ms.team = 'UD Atzeneta' THEN 1 END) as fail_ptp,
+            COUNT(CASE WHEN ms.idcode = 'Presión tras perdida'
+                      AND ms.idgroup = 'Presión conjunta'
+                      AND ms.team = 'UD Atzeneta' THEN 1 END) as total_ptp,
             -- RET (Retornos)
-            COUNT(CASE WHEN idcode = 'Retornos' 
-                      AND idgroup = 'Retorno conjunto'
-                      AND idtext = 'Si'
-                      AND team = 'UD Atzeneta' THEN 1 END) as success_ret,
-            COUNT(CASE WHEN idcode = 'Retornos'
-                      AND idgroup = 'Retorno conjunto'
-                      AND idtext = 'No'
-                      AND team = 'UD Atzeneta' THEN 1 END) as fail_ret,
-            COUNT(CASE WHEN idcode = 'Retornos'
-                      AND idgroup = 'Retorno conjunto'
-                      AND team = 'UD Atzeneta' THEN 1 END) as total_ret
-        FROM MatchStats
-        GROUP BY `match`, fecha_parsed, fecha_original, match_type, match_number
+            COUNT(CASE WHEN ms.idcode = 'Retornos' 
+                      AND ms.idgroup = 'Retorno conjunto'
+                      AND ms.idtext = 'Si'
+                      AND ms.team = 'UD Atzeneta' THEN 1 END) as success_ret,
+            COUNT(CASE WHEN ms.idcode = 'Retornos'
+                      AND ms.idgroup = 'Retorno conjunto'
+                      AND ms.idtext = 'No'
+                      AND ms.team = 'UD Atzeneta' THEN 1 END) as fail_ret,
+            COUNT(CASE WHEN ms.idcode = 'Retornos'
+                      AND ms.idgroup = 'Retorno conjunto'
+                      AND ms.team = 'UD Atzeneta' THEN 1 END) as total_ret,
+            -- OC (Ocupación de Centros)
+            COUNT(CASE WHEN ms.idcode = 'Ocupación del área centros' 
+                      AND ms.idgroup = 'Buena ocupación'
+                      AND ms.idtext = 'Si'
+                      AND ms.team = 'UD Atzeneta' THEN 1 END) as success_oc,
+            COUNT(CASE WHEN ms.idcode = 'Ocupación del área centros'
+                      AND ms.idgroup = 'Buena ocupación'
+                      AND ms.idtext = 'No'
+                      AND ms.team = 'UD Atzeneta' THEN 1 END) as fail_oc,
+            COUNT(CASE WHEN ms.idcode = 'Ocupación del área centros'
+                      AND ms.idgroup = 'Buena ocupación'
+                      AND ms.team = 'UD Atzeneta' THEN 1 END) as total_oc,
+            -- VD (Vigilancias Defensivas)
+            COUNT(CASE WHEN ms.idcode = 'Vigilancias Defensivas' 
+                      AND ms.idgroup = 'Rivales controlados'
+                      AND ms.idtext = 'Si'
+                      AND ms.team = 'UD Atzeneta' THEN 1 END) as success_vd,
+            COUNT(CASE WHEN ms.idcode = 'Vigilancias Defensivas'
+                      AND ms.idgroup = 'Rivales controlados'
+                      AND ms.idtext = 'No'
+                      AND ms.team = 'UD Atzeneta' THEN 1 END) as fail_vd,
+            COUNT(CASE WHEN ms.idcode = 'Vigilancias Defensivas'
+                      AND ms.idgroup = 'Rivales controlados'
+                      AND ms.team = 'UD Atzeneta' THEN 1 END) as total_vd
+        FROM MatchStats ms
+        GROUP BY ms.`match`, ms.fecha_parsed, ms.fecha_original, ms.match_type, ms.match_number
     )
     SELECT 
         `match`,
         fecha_original as fecha,
+        descripcion,
         match_type,
         match_number,
         -- BLP stats
@@ -141,10 +168,21 @@ def get_all_matches_data():
         fail_ptp,
         total_ptp,
         ROUND((success_ptp * 100.0) / NULLIF(total_ptp, 0), 2) as ptp_percentage,
+        -- RET stats
         success_ret,
         fail_ret,
         total_ret,
-        ROUND((success_ret * 100.0) / NULLIF(total_ret, 0), 2) as ret_percentage
+        ROUND((success_ret * 100.0) / NULLIF(total_ret, 0), 2) as ret_percentage,
+        -- OC stats
+        success_oc,
+        fail_oc,
+        total_oc,
+        ROUND((success_oc * 100.0) / NULLIF(total_oc, 0), 2) as oc_percentage,
+        -- VD stats
+        success_vd,
+        fail_vd,
+        total_vd,
+        ROUND((success_vd * 100.0) / NULLIF(total_vd, 0), 2) as vd_percentage
     FROM BallPossession
     ORDER BY fecha_parsed ASC;
     """
@@ -154,22 +192,34 @@ def create_evolution_table():
     # Obtener datos
     data = get_all_matches_data()
     
-    # Convertir a DataFrame
+    # Convertir a DataFrame y ordenar por fecha
     df = pd.DataFrame(data)
+    df['fecha_parsed'] = pd.to_datetime(df['fecha'])  # Detectará automáticamente el formato ISO
+    df = df.sort_values('fecha_parsed')
     
     if not df.empty:
         metrics_rows = []
         style_conditions = []
         header_styles = []
         
-        for metric in ['BLP %', 'BLR %', 'PTP %', 'RET %']: 
+        def get_match_description(row):
+            tipo = 'J' if row['match_type'] == 'Liga' else 'C'
+            desc = row['descripcion'] if pd.notna(row['descripcion']) else ''
+            # Convertir la fecha al formato deseado para mostrar
+            fecha_display = row['fecha_parsed'].strftime('%d/%m/%Y')
+            return f"{desc}\n{tipo}{row['match_number']}\n({fecha_display})"
+
+        for metric in ['BLP %', 'BLR %', 'PTP %', 'RET %', 'OC %', 'VD %']:
             metric_row = {'Métrica': metric}
             columnas_orden = []
             partidos_grupo = []
             
+            # Iterar sobre el DataFrame ordenado por fecha
             for _, row in df.iterrows():
                 tipo = 'J' if row['match_type'] == 'Liga' else 'C'
-                columna = f"{tipo}{row['match_number']}\n({row['fecha']})"
+                fecha_display = row['fecha_parsed'].strftime('%d/%m/%Y')
+                # Crear ID de columna que incluya la fecha para mantener el orden
+                columna_id = f"{row['fecha_parsed'].strftime('%Y%m%d')}_{tipo}{row['match_number']}"
                 
                 # Seleccionar el porcentaje según la métrica
                 if metric == 'BLP %':
@@ -178,19 +228,23 @@ def create_evolution_table():
                     porcentaje = row['blr_percentage']
                 elif metric == 'PTP %':
                     porcentaje = row['ptp_percentage']
-                else:  # RET %
+                elif metric == 'RET %':
                     porcentaje = row['ret_percentage']
+                elif metric == 'OC %':
+                    porcentaje = row['oc_percentage']
+                else:  # VD %
+                    porcentaje = row['vd_percentage']
                 
                 if porcentaje is None:
                     porcentaje = 0
                 
-                metric_row[columna] = f"{float(porcentaje):.2f}%"
-                partidos_grupo.append(columna)
+                metric_row[columna_id] = f"{float(porcentaje):.2f}%"
+                partidos_grupo.append(columna_id)
                 
-                # Estilos igual que antes
+                # Estilos
                 style_conditions.append({
                     'if': {
-                        'column_id': columna,
+                        'column_id': columna_id,
                         'filter_query': '{Métrica} = "' + metric + '"'
                     },
                     'backgroundColor': get_color_scale(float(porcentaje)),
@@ -198,23 +252,19 @@ def create_evolution_table():
                 })
                 
                 header_styles.append({
-                    'if': {'column_id': columna},
-                    'backgroundColor': 'rgba(135, 206, 235, 0.7)' if tipo == 'J' else 'rgba(255, 165, 0, 0.7)'
+                    'if': {'column_id': columna_id},
+                    'backgroundColor': 'rgba(135, 206, 235, 0.7)' if tipo == 'J' else 'rgba(255, 165, 0, 0.7)',
+                    'font-size': '10px'
                 })
                 
                 # Después de cada 5 partidos, añadir la media
                 if len(partidos_grupo) == 5:
-                    # Añadir los 5 partidos a las columnas ordenadas
                     columnas_orden.extend(partidos_grupo)
-                    
-                    # Calcular y añadir la media
                     valores = [float(metric_row[col].strip('%')) for col in partidos_grupo]
                     media = sum(valores) / len(valores)
                     media_col = f'Media {len(columnas_orden)//5}'
                     metric_row[media_col] = f"{media:.2f}%"
                     columnas_orden.append(media_col)
-                    
-                    # Reiniciar grupo
                     partidos_grupo = []
             
             # Procesar últimos partidos si quedan
@@ -226,53 +276,83 @@ def create_evolution_table():
                 metric_row[media_col] = f"{media:.2f}%"
                 columnas_orden.append(media_col)
             
-            # Añadir media total por fila
+            # Media total
             valores_totales = []
-
-            # Iterar por cada columna relevante para la métrica
             for columna in metric_row.keys():
-                if columna not in ['Métrica', 'Media Total']:  # Excluir columnas no relacionadas
+                if columna not in ['Métrica', 'Media Total']:
                     try:
                         porcentaje = float(metric_row[columna].strip('%'))
                         valores_totales.append(porcentaje)
                     except (ValueError, AttributeError):
-                        continue  # Saltar si hay un error al convertir
+                        continue
 
             if valores_totales:
-                # Calcular la media total de la fila
                 media_total = sum(valores_totales) / len(valores_totales)
                 metric_row['Media Total'] = f"{media_total:.2f}%"
                 columnas_orden.append('Media Total')
-
             
             metrics_rows.append(metric_row)
         
-        # Crear DataFrame final con las columnas en el orden correcto
+        # Crear DataFrame final con las columnas ordenadas
         final_df = pd.DataFrame(metrics_rows)
         final_df = final_df[['Métrica'] + columnas_orden]
         
+        # Crear columnas con nombres personalizados
+        columns = [{"name": "Métrica", "id": "Métrica"}]
+        for col in columnas_orden:
+            if "Media" in col:
+                columns.append({"name": col, "id": col})
+            else:
+                match_info = next(row for _, row in df.iterrows() 
+                                if col.split('_')[1] == f"{('J' if row['match_type'] == 'Liga' else 'C')}{row['match_number']}")
+                columns.append({
+                    "name": get_match_description(match_info),
+                    "id": col
+                })
+        
         return dash_table.DataTable(
             id='evolution-table',
-            columns=[{"name": i, "id": i} for i in final_df.columns],
+            columns=columns,
             data=final_df.to_dict('records'),
             style_table={
+                'width': '100%',
                 'overflowX': 'auto',
-                'width': '100%'
+                'maxWidth': '100vw',  # Usa el ancho total disponible
+                'fontSize': '0.9rem'   # Reduce ligeramente el tamaño de fuente
             },
             style_header={
                 'backgroundColor': 'rgb(230, 230, 230)',
                 'fontWeight': 'bold',
                 'textAlign': 'center',
                 'whiteSpace': 'pre-line',
-                'padding': '10px'
+                'padding': '5px',      # Reducido el padding
+                'height': 'auto',
+                'fontSize': '0.85rem'  # Texto ligeramente más pequeño en encabezados
             },
             style_cell={
                 'textAlign': 'center',
-                'padding': '10px',
-                'minWidth': '80px'
+                'padding': '5px',      # Reducido el padding
+                'minWidth': '80px',    # Reducido el ancho mínimo
+                'maxWidth': '150px',   # Reducido el ancho máximo
+                'whiteSpace': 'normal',
+                'height': 'auto',
+                'fontSize': '0.9rem'   # Tamaño de fuente consistente
             },
+            style_cell_conditional=[
+                {
+                    'if': {'column_id': 'Métrica'},
+                    'minWidth': '100px',
+                    'width': '100px',
+                    'maxWidth': '100px',
+                }
+            ],
             style_data_conditional=style_conditions,
-            style_header_conditional=header_styles
+            style_header_conditional=header_styles,
+            markdown_options={'html': True},
+            css=[{
+                'selector': '.dash-table-container',
+                'rule': 'margin: 0 auto; max-width: 100%; font-size: 0.9rem;'
+            }]
         )
     return html.Div("No hay datos disponibles")
 
@@ -299,10 +379,12 @@ def generar_analisis_kpis(df):
         'BLP %': 'Balones Largos Propios ganados',
         'BLR %': 'Balones Largos Rivales ganados',
         'PTP %': 'Presión Tras Pérdida exitosa',
-        'RET %': 'Retornos exitosos'
+        'RET %': 'Retornos exitosos',
+        'OC %': 'Ocupación del área en centros',
+        'VD %': 'Vigilancias Defensivas efectivas'
     }
     
-    for metric in ['BLP %', 'BLR %', 'PTP %', 'RET %']:
+    for metric in ['BLP %', 'BLR %', 'PTP %', 'RET %', 'OC %', 'VD %']:
         valores = df[df['Métrica'] == metric].iloc[0]
         valores_partidos = []
         
@@ -365,6 +447,16 @@ def generar_analisis_kpis(df):
             elif metric == 'RET %':
                 if media < 50:
                     analisis += "Se recomienda trabajar en la organización defensiva y los retornos ordenados. "
+            elif metric == 'OC %':
+                if media < 60:
+                    analisis += "Se recomienda mejorar la ocupación de espacios en el área durante los centros. "
+                if maximo - minimo > 25:
+                    analisis += "La variabilidad en la ocupación del área necesita ser más consistente. "
+            elif metric == 'VD %':
+                if media < 65:
+                    analisis += "Es importante mejorar el control y seguimiento de los rivales en fase defensiva. "
+                if media_ultimos < media:
+                    analisis += "Se sugiere reforzar el trabajo de vigilancias defensivas en los entrenamientos. "
             
             insights.append(html.Div([
                 html.H5(metric, className="text-primary"),
@@ -382,46 +474,50 @@ app.layout = html.Div([
         html.Img(
             src='/assets/escudo.png',
             style={
-                'height': '100px',
+                'height': '80px',  # Reducido ligeramente
                 'display': 'block',
                 'margin': 'auto',
-                'marginBottom': '20px'
+                'marginBottom': '15px'
             }
         ),
-        html.H1("UD Atzeneta Analytics", className="text-center my-4"),
+        html.H1("UD Atzeneta Analytics", 
+                className="text-center my-3",  # Reducido el margen
+                style={'fontSize': '2rem'}),   # Tamaño de fuente más pequeño
         
         # Tarjeta informativa
         dbc.Card([
             dbc.CardBody([
-                html.H4("KPI", className="card-title"),
+                html.H4("KPI", className="card-title", style={'fontSize': '1.5rem'}),
                 html.P(
                     "métricas que permiten medir y determinar la efectividad y rentabilidad de nuestro equipo "
                     ", UD Atzeneta",
-                    className="card-text"
+                    className="card-text",
+                    style={'fontSize': '0.9rem'}
                 )
             ])
-        ], className="mb-4"),
+        ], className="mb-3"),  # Reducido el margen
         
         # Tabla de evolución
         html.Div([
             create_evolution_table()
-        ], className="mb-4"),
+        ], className="mb-3", style={'overflowX': 'auto', 'width': '100%'}),
         
         # Análisis automático con loading
         dbc.Card([
             dbc.CardBody([
-                html.H4("Análisis Automático", className="card-title"),
+                html.H4("Análisis Automático", 
+                       className="card-title",
+                       style={'fontSize': '1.5rem'}),
                 dcc.Loading(
                     id="loading-analysis",
                     type="default",
                     children=html.Div(id='analisis-automatico')
                 )
             ])
-        ], className="mb-4"),
+        ], className="mb-3"),
         
-        
-    ], fluid=True)
-])
+    ], fluid=True, className="px-2")  # Reducido el padding horizontal
+], style={'maxWidth': '100vw', 'overflow': 'hidden'})
 
 # Y justo después del layout, añade el callback:
 @app.callback(
