@@ -3,6 +3,9 @@ from dash import html, dcc, dash_table
 import dash_bootstrap_components as dbc
 import pandas as pd
 import mysql.connector
+import os
+
+
 
 # Configuración de la base de datos
 DB_CONFIG = {
@@ -16,6 +19,7 @@ DB_CONFIG = {
 
 # Inicializar la aplicación Dash
 app = dash.Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP])
+server = app.server  
 
 # Función para ejecutar consultas
 def execute_query(query, params=None):
@@ -314,4 +318,5 @@ app.layout = html.Div([
 ])
 
 if __name__ == '__main__':
-    app.run_server(debug=True)
+    port = int(os.environ.get("PORT", 8080))
+    app.run_server(host='0.0.0.0', port=port, debug=False)
