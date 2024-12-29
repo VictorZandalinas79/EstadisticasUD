@@ -1,5 +1,5 @@
 import dash
-from dash import html, dcc, dash_table
+from dash import html, dcc, dash_table, Output, Input
 import dash_bootstrap_components as dbc
 import pandas as pd
 import mysql.connector
@@ -291,6 +291,89 @@ def get_color_scale(value):
         red = 255
         green = max(0, int(165 * (value / 60)))
         return f'rgb({red}, {green}, 0)'
+    
+def generar_analisis_kpis(df):
+    insights = []
+    
+    descripcion_metricas = {
+        'BLP %': 'Balones Largos Propios ganados',
+        'BLR %': 'Balones Largos Rivales ganados',
+        'PTP %': 'Presión Tras Pérdida exitosa',
+        'RET %': 'Retornos exitosos'
+    }
+    
+    for metric in ['BLP %', 'BLR %', 'PTP %', 'RET %']:
+        valores = df[df['Métrica'] == metric].iloc[0]
+        valores_partidos = []
+        
+        # Recopilar datos de partidos
+        for columna, valor in valores.items():
+            if columna != 'Métrica' and 'Media' not in columna:
+                try:
+                    valor_num = float(valor.strip('%'))
+                    valores_partidos.append({
+                        'partido': columna,
+                        'valor': valor_num,
+                        'tipo': 'Liga' if 'J' in columna else 'Copa'
+                    })
+                except (ValueError, AttributeError):
+                    continue
+        
+        if valores_partidos:
+            # Análisis estadístico
+            valores_num = [v['valor'] for v in valores_partidos]
+            media = sum(valores_num) / len(valores_num)
+            maximo = max(valores_num)
+            minimo = min(valores_num)
+            ultimos_3 = valores_num[-3:] if len(valores_num) >= 3 else valores_num
+            media_ultimos = sum(ultimos_3) / len(ultimos_3)
+            
+            # Generar análisis narrativo
+            analisis = f"Análisis de {descripcion_metricas[metric]}:\n\n"
+            
+            # Tendencia general
+            analisis += "📊 Tendencia General:\n"
+            if media_ultimos > media + 5:
+                analisis += "El equipo muestra una clara mejoría en las últimas jornadas. "
+            elif media_ultimos < media - 5:
+                analisis += "Se observa un descenso en el rendimiento reciente. "
+            else:
+                analisis += "El rendimiento se mantiene estable. "
+            
+            # Puntos destacables
+            mejor_partido = max(valores_partidos, key=lambda x: x['valor'])
+            peor_partido = min(valores_partidos, key=lambda x: x['valor'])
+            
+            analisis += f"\n\n🔍 Puntos Destacables:\n"
+            analisis += f"- Mejor registro: {mejor_partido['valor']:.1f}% en {mejor_partido['partido']}\n"
+            analisis += f"- Registro más bajo: {peor_partido['valor']:.1f}% en {peor_partido['partido']}\n"
+            analisis += f"- Promedio general: {media:.1f}%\n"
+            
+            # Recomendaciones específicas
+            analisis += "\n📈 Análisis y Recomendaciones:\n"
+            if metric == 'BLP %':
+                if media < 50:
+                    analisis += "Se recomienda mejorar la preparación de los balones largos y la coordinación con los receptores. "
+                if maximo - minimo > 30:
+                    analisis += "Hay una gran variabilidad en el rendimiento que necesita estabilizarse. "
+            elif metric == 'BLR %':
+                if media < 45:
+                    analisis += "Se sugiere trabajar en la anticipación y posicionamiento defensivo. "
+            elif metric == 'PTP %':
+                if media < 55:
+                    analisis += "Es importante mejorar la reacción colectiva tras pérdida. "
+            elif metric == 'RET %':
+                if media < 50:
+                    analisis += "Se recomienda trabajar en la organización defensiva y los retornos ordenados. "
+            
+            insights.append(html.Div([
+                html.H5(metric, className="text-primary"),
+                html.P(analisis.split('\n\n')[0]),  # Tendencia general
+                html.P(analisis.split('\n\n')[1]),  # Puntos destacables
+                html.P(analisis.split('\n\n')[2]),  # Recomendaciones
+            ], className="mb-4"))
+    
+    return insights
 
 # Layout principal
 app.layout = html.Div([
@@ -299,7 +382,7 @@ app.layout = html.Div([
         html.Img(
             src='/assets/escudo.png',
             style={
-                'height': '100px',  # Ajusta el tamaño según necesites
+                'height': '100px',
                 'display': 'block',
                 'margin': 'auto',
                 'marginBottom': '20px'
@@ -323,8 +406,35 @@ app.layout = html.Div([
         html.Div([
             create_evolution_table()
         ], className="mb-4"),
+        
+        # Análisis automático con loading
+        dbc.Card([
+            dbc.CardBody([
+                html.H4("Análisis Automático", className="card-title"),
+                dcc.Loading(
+                    id="loading-analysis",
+                    type="default",
+                    children=html.Div(id='analisis-automatico')
+                )
+            ])
+        ], className="mb-4"),
+        
+        
     ], fluid=True)
 ])
+
+# Y justo después del layout, añade el callback:
+@app.callback(
+    Output('analisis-automatico', 'children'),
+    Input('evolution-table', 'data')
+)
+def update_analisis(data):
+    if not data:
+        return "No hay datos para analizar"
+    
+    df = pd.DataFrame(data)
+    return generar_analisis_kpis(df)
+    
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 8080))
