@@ -24,16 +24,6 @@ app = dash.Dash(
     external_stylesheets=[dbc.themes.BOOTSTRAP]
 )
 
-# Inicializar la aplicación Dash
-app = dash.Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP])
-server = app.server
-
-# Añadir dcc.Interval al principio para actualización automática
-dcc.Interval(
-   id='interval-component',
-   interval=30*1000,  # actualiza cada 30 segundos
-   n_intervals=0
-)
 
 # Función para ejecutar consultas
 def execute_query(query, params=None):
@@ -483,54 +473,98 @@ def generar_analisis_kpis(df):
 
 # Layout principal
 app.layout = html.Div([
-    dbc.Container([
-        # Añadir el escudo
-        html.Img(
-            src='/assets/escudo.png',
-            style={
-                'height': '80px',  # Reducido ligeramente
-                'display': 'block',
-                'margin': 'auto',
-                'marginBottom': '15px'
+   dbc.Container([
+       # Componente de actualización automática
+       dcc.Interval(
+           id='interval-component',
+           interval=30*1000,  # actualiza cada 30 segundos
+           n_intervals=0
+       ),
+       
+       # Añadir el escudo
+       html.Img(
+           src='/assets/escudo.png',
+           style={
+               'height': '80px',
+               'display': 'block',
+               'margin': 'auto',
+               'marginBottom': '15px'
+           }
+       ),
+       
+       html.H1("UD Atzeneta Analytics", 
+               className="text-center my-3",
+               style={'fontSize': '2rem'}),
+       
+       # Tarjeta informativa
+       dbc.Card([
+           dbc.CardBody([
+               html.H4("KPI", className="card-title", style={'fontSize': '1.5rem'}),
+               html.P(
+                   "métricas que permiten medir y determinar la efectividad y rentabilidad de nuestro equipo "
+                   ", UD Atzeneta",
+                   className="card-text",
+                   style={'fontSize': '0.9rem'}
+               )
+           ])
+       ], className="mb-3"),
+       
+       # Tabla de evolución
+       # Tabla de evolución
+html.Div([
+    dash_table.DataTable(
+        id='evolution-table',
+        style_table={
+            'width': '100%',
+            'overflowX': 'auto',
+            'maxWidth': '100vw',
+            'fontSize': '0.9rem'
+        },
+        style_header={
+            'backgroundColor': 'rgb(230, 230, 230)',
+            'fontWeight': 'bold',
+            'textAlign': 'center',
+            'whiteSpace': 'pre-line',
+            'padding': '5px',
+            'height': 'auto',
+            'fontSize': '0.85rem'
+        },
+        style_cell={
+            'textAlign': 'center',
+            'padding': '5px',
+            'minWidth': '80px',
+            'maxWidth': '150px',
+            'whiteSpace': 'normal',
+            'height': 'auto',
+            'fontSize': '0.9rem'
+        },
+        style_cell_conditional=[
+            {
+                'if': {'column_id': 'Métrica'},
+                'minWidth': '100px',
+                'width': '100px',
+                'maxWidth': '100px',
             }
-        ),
-        html.H1("UD Atzeneta Analytics", 
-                className="text-center my-3",  # Reducido el margen
-                style={'fontSize': '2rem'}),   # Tamaño de fuente más pequeño
-        
-        # Tarjeta informativa
-        dbc.Card([
-            dbc.CardBody([
-                html.H4("KPI", className="card-title", style={'fontSize': '1.5rem'}),
-                html.P(
-                    "métricas que permiten medir y determinar la efectividad y rentabilidad de nuestro equipo "
-                    ", UD Atzeneta",
-                    className="card-text",
-                    style={'fontSize': '0.9rem'}
-                )
-            ])
-        ], className="mb-3"),  # Reducido el margen
-        
-        # Tabla de evolución
-        html.Div([
-            create_evolution_table()
-        ], className="mb-3", style={'overflowX': 'auto', 'width': '100%'}),
-        
-        # Análisis automático con loading
-        dbc.Card([
-            dbc.CardBody([
-                html.H4("Análisis Automático", 
-                       className="card-title",
-                       style={'fontSize': '1.5rem'}),
-                dcc.Loading(
-                    id="loading-analysis",
-                    type="default",
-                    children=html.Div(id='analisis-automatico')
-                )
-            ])
-        ], className="mb-3"),
-        
-    ], fluid=True, className="px-2")  # Reducido el padding horizontal
+        ],
+        markdown_options={'html': True}
+    )
+], className="mb-3", style={'overflowX': 'auto', 'width': '100%'}),
+       
+       # Análisis automático con loading
+       dbc.Card([
+           dbc.CardBody([
+               html.H4("Análisis Automático", 
+                      className="card-title",
+                      style={'fontSize': '1.5rem'}),
+               dcc.Loading(
+                   id="loading-analysis",
+                   type="default",
+                   children=html.Div(id='analisis-automatico')
+               )
+           ])
+       ], className="mb-3"),
+       
+   ], fluid=True, className="px-2")
 ], style={'maxWidth': '100vw', 'overflow': 'hidden'})
 
 # Y justo después del layout, añade los callbacks:
@@ -548,17 +582,132 @@ def update_analisis(data, n_intervals):
 
 # Nuevo callback para actualizar la tabla automáticamente
 @app.callback(
-   Output('evolution-table', 'data'),
+   [Output('evolution-table', 'data'),
+    Output('evolution-table', 'columns'),
+    Output('evolution-table', 'style_data_conditional'),
+    Output('evolution-table', 'style_header_conditional')],
    Input('interval-component', 'n_intervals')
 )
 def update_table_data(n_intervals):
-   data = get_all_matches_data()
-   if data:
-       df = pd.DataFrame(data)
-       df['fecha_parsed'] = pd.to_datetime(df['fecha'])
-       df = df.sort_values('fecha_parsed')
-       return df.to_dict('records')
-   return []
+    print(f"Actualizando datos: {n_intervals}")  # Para ver en los logs cuando se actualiza
+    data = get_all_matches_data()
+    if data:
+        df = pd.DataFrame(data)
+        df['fecha_parsed'] = pd.to_datetime(df['fecha'])
+        df = df.sort_values('fecha_parsed')
+        
+        metrics_rows = []
+        style_conditions = []
+        header_styles = []
+        
+        def get_match_description(row):
+            tipo = 'J' if row['match_type'] == 'Liga' else 'C'
+            desc = row['descripcion'] if pd.notna(row['descripcion']) else ''
+            fecha_display = row['fecha_parsed'].strftime('%d/%m/%Y')
+            return f"{desc}\n{tipo}{row['match_number']}\n({fecha_display})"
+
+        for metric in ['BLP %', 'BLR %', 'PTP %', 'RET %', 'OC %', 'VD %']:
+            metric_row = {'Métrica': metric}
+            columnas_orden = []
+            partidos_grupo = []
+            
+            # Iterar sobre el DataFrame ordenado por fecha
+            for _, row in df.iterrows():
+                tipo = 'J' if row['match_type'] == 'Liga' else 'C'
+                fecha_display = row['fecha_parsed'].strftime('%d/%m/%Y')
+                columna_id = f"{row['fecha_parsed'].strftime('%Y%m%d')}_{tipo}{row['match_number']}"
+                
+                # Seleccionar el porcentaje según la métrica
+                if metric == 'BLP %':
+                    porcentaje = row['blp_percentage']
+                elif metric == 'BLR %':
+                    porcentaje = row['blr_percentage']
+                elif metric == 'PTP %':
+                    porcentaje = row['ptp_percentage']
+                elif metric == 'RET %':
+                    porcentaje = row['ret_percentage']
+                elif metric == 'OC %':
+                    porcentaje = row['oc_percentage']
+                else:  # VD %
+                    porcentaje = row['vd_percentage']
+                
+                if porcentaje is None:
+                    porcentaje = 0
+                
+                metric_row[columna_id] = f"{float(porcentaje):.2f}%"
+                partidos_grupo.append(columna_id)
+                
+                # Estilos
+                style_conditions.append({
+                    'if': {
+                        'column_id': columna_id,
+                        'filter_query': '{Métrica} = "' + metric + '"'
+                    },
+                    'backgroundColor': get_color_scale(float(porcentaje)),
+                    'color': 'white' if float(porcentaje) > 40 else 'black'
+                })
+                
+                header_styles.append({
+                    'if': {'column_id': columna_id},
+                    'backgroundColor': 'rgba(135, 206, 235, 0.7)' if tipo == 'J' else 'rgba(255, 165, 0, 0.7)',
+                    'font-size': '10px'
+                })
+                
+                # Después de cada 5 partidos, añadir la media
+                if len(partidos_grupo) == 5:
+                    columnas_orden.extend(partidos_grupo)
+                    valores = [float(metric_row[col].strip('%')) for col in partidos_grupo]
+                    media = sum(valores) / len(valores)
+                    media_col = f'Media {len(columnas_orden)//5}'
+                    metric_row[media_col] = f"{media:.2f}%"
+                    columnas_orden.append(media_col)
+                    partidos_grupo = []
+            
+            # Procesar últimos partidos si quedan
+            if partidos_grupo:
+                columnas_orden.extend(partidos_grupo)
+                valores = [float(metric_row[col].strip('%')) for col in partidos_grupo]
+                media = sum(valores) / len(valores)
+                media_col = f'Media {(len(columnas_orden)-len(partidos_grupo))//5 + 1}'
+                metric_row[media_col] = f"{media:.2f}%"
+                columnas_orden.append(media_col)
+            
+            # Media total
+            valores_totales = []
+            for columna in metric_row.keys():
+                if columna not in ['Métrica', 'Media Total']:
+                    try:
+                        porcentaje = float(metric_row[columna].strip('%'))
+                        valores_totales.append(porcentaje)
+                    except (ValueError, AttributeError):
+                        continue
+
+            if valores_totales:
+                media_total = sum(valores_totales) / len(valores_totales)
+                metric_row['Media Total'] = f"{media_total:.2f}%"
+                columnas_orden.append('Media Total')
+            
+            metrics_rows.append(metric_row)
+        
+        # Crear DataFrame final con las columnas ordenadas
+        final_df = pd.DataFrame(metrics_rows)
+        final_df = final_df[['Métrica'] + columnas_orden]
+        
+        # Crear columnas con nombres personalizados
+        columns = [{"name": "Métrica", "id": "Métrica"}]
+        for col in columnas_orden:
+            if "Media" in col:
+                columns.append({"name": col, "id": col})
+            else:
+                match_info = next(row for _, row in df.iterrows() 
+                                if col.split('_')[1] == f"{('J' if row['match_type'] == 'Liga' else 'C')}{row['match_number']}")
+                columns.append({
+                    "name": get_match_description(match_info),
+                    "id": col
+                })
+        
+        return final_df.to_dict('records'), columns, style_conditions, header_styles
+    return [], [], [], []
 
 if __name__ == '__main__':
    port = int(os.environ.get('PORT', 10000))
