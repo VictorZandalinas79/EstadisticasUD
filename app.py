@@ -4,16 +4,25 @@ import dash_bootstrap_components as dbc
 import pandas as pd
 import mysql.connector
 import os
+from flask import Flask
 
 # Configuración de la base de datos
 DB_CONFIG = {
-   'host': 'dbeastbengal2324.cfo6g0og0ypz.eu-north-1.rds.amazonaws.com',
-   'user': 'admin',
-   'password': 'Villafranca.06',  # La contraseña correcta con el punto
-   'database': 'UDAtzeneta',
-   'charset': 'utf8mb4',
-   'port': 3306
+    'host': 'dbeastbengal2324.cfo6g0og0ypz.eu-north-1.rds.amazonaws.com',
+    'user': 'admin',
+    'password': 'Villafranca.06',
+    'database': 'UDAtzeneta',
+    'charset': 'utf8mb4',
+    'port': 3306
 }
+
+# Inicializar la aplicación Dash
+server = Flask(__name__)  # Primero crear el servidor Flask
+app = dash.Dash(
+    __name__, 
+    server=server,  # Usar el servidor Flask creado
+    external_stylesheets=[dbc.themes.BOOTSTRAP]
+)
 
 # Inicializar la aplicación Dash
 app = dash.Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP])
