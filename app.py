@@ -5,21 +5,26 @@ import pandas as pd
 import mysql.connector
 import os
 
-
-
 # Configuración de la base de datos
 DB_CONFIG = {
-    'host': 'dbeastbengal2324.cfo6g0og0ypz.eu-north-1.rds.amazonaws.com',
-    'user': 'admin',
-    'password': 'Villafranca.06',  # La contraseña correcta con el punto
-    'database': 'UDAtzeneta',
-    'charset': 'utf8mb4',
-    'port': 3306
+   'host': 'dbeastbengal2324.cfo6g0og0ypz.eu-north-1.rds.amazonaws.com',
+   'user': 'admin',
+   'password': 'Villafranca.06',  # La contraseña correcta con el punto
+   'database': 'UDAtzeneta',
+   'charset': 'utf8mb4',
+   'port': 3306
 }
 
 # Inicializar la aplicación Dash
 app = dash.Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP])
-server = app.server  
+server = app.server
+
+# Añadir dcc.Interval al principio para actualización automática
+dcc.Interval(
+   id='interval-component',
+   interval=30*1000,  # actualiza cada 30 segundos
+   n_intervals=0
+)
 
 # Función para ejecutar consultas
 def execute_query(query, params=None):
@@ -519,23 +524,37 @@ app.layout = html.Div([
     ], fluid=True, className="px-2")  # Reducido el padding horizontal
 ], style={'maxWidth': '100vw', 'overflow': 'hidden'})
 
-# Y justo después del layout, añade el callback:
+# Y justo después del layout, añade los callbacks:
 @app.callback(
-    Output('analisis-automatico', 'children'),
-    Input('evolution-table', 'data')
+   Output('analisis-automatico', 'children'),
+   [Input('evolution-table', 'data'),
+    Input('interval-component', 'n_intervals')]
 )
-def update_analisis(data):
-    if not data:
-        return "No hay datos para analizar"
-    
-    df = pd.DataFrame(data)
-    return generar_analisis_kpis(df)
-    
+def update_analisis(data, n_intervals):
+   if not data:
+       return "No hay datos para analizar"
+   
+   df = pd.DataFrame(data)
+   return generar_analisis_kpis(df)
+
+# Nuevo callback para actualizar la tabla automáticamente
+@app.callback(
+   Output('evolution-table', 'data'),
+   Input('interval-component', 'n_intervals')
+)
+def update_table_data(n_intervals):
+   data = get_all_matches_data()
+   if data:
+       df = pd.DataFrame(data)
+       df['fecha_parsed'] = pd.to_datetime(df['fecha'])
+       df = df.sort_values('fecha_parsed')
+       return df.to_dict('records')
+   return []
 
 if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 10000))
-    app.run_server(
-        host='0.0.0.0',
-        port=port,
-        debug=False
-    )
+   port = int(os.environ.get('PORT', 10000))
+   app.run_server(
+       host='0.0.0.0',
+       port=port,
+       debug=False
+   )
