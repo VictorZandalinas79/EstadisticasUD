@@ -151,11 +151,11 @@ def get_all_matches_data():
            -- Ocasiones Atz
            COUNT(CASE WHEN ms.idcode = 'Xg' 
                    AND ms.idtext IN ('Ocasión clarisima', 'Ocasión Clara', 'Remate sin importancia')
-                   AND ms.team = 'UD Atzeneta' THEN 1 END) as ocasiones_atz,
+                   AND ms.team = 'UD Atzeneta' THEN 1 END) as ocas_atz,
            -- Ocasiones Rival
            COUNT(CASE WHEN ms.idcode = 'Xg' 
                    AND ms.idtext IN ('Ocasión clarisima', 'Ocasión Clara', 'Remate sin importancia')
-                   AND ms.team != 'UD Atzeneta' THEN 1 END) as ocasiones_rival
+                   AND ms.team != 'UD Atzeneta' THEN 1 END) as ocas_rival
        FROM MatchStats ms
        GROUP BY ms.`match`, ms.fecha_parsed, ms.fecha_original, ms.match_type, ms.match_number
    )
@@ -196,9 +196,9 @@ def get_all_matches_data():
        total_vd,
        ROUND((success_vd * 100.0) / NULLIF(total_vd, 0), 2) as vd_percentage,
        -- Ocasiones stats
-       ocasiones_atz,
-       ocasiones_rival,
-       (ocasiones_atz - ocasiones_rival) as dif_ocasiones
+       ocas_atz,
+       ocas_rival,
+       (ocas_atz - ocas_rival) as dif_ocas
    FROM BallPossession
    ORDER BY fecha_parsed ASC;
    """
@@ -225,7 +225,7 @@ def create_evolution_table():
             fecha_display = row['fecha_parsed'].strftime('%d/%m/%Y')
             return f"{desc}\n{tipo}{row['match_number']}\n({fecha_display})"
 
-        for metric in ['BLP %', 'BLR %', 'PTP %', 'RET %', 'OC %', 'VD %', 'Ocasiones Atz', 'Ocasiones Rival', 'Dif Ocasiones']:
+        for metric in ['BLP %', 'BLR %', 'PTP %', 'RET %', 'OC %', 'VD %', 'Ocas Atz', 'Ocas Rival', 'Dif Ocas']:
             metric_row = {'Métrica': metric}
             columnas_orden = []
             partidos_grupo = []
@@ -237,18 +237,18 @@ def create_evolution_table():
                 # Crear ID de columna que incluya la fecha para mantener el orden
                 columna_id = f"{row['fecha_parsed'].strftime('%Y%m%d')}_{tipo}{row['match_number']}"
                 
-                if metric in ['Ocasiones Atz', 'Ocasiones Rival', 'Dif Ocasiones']:
+                if metric in ['Ocas Atz', 'Ocas Rival', 'Dif Ocas']:
                     # Para métricas de ocasiones, usar el valor directamente
-                    valor = row['ocasiones_atz'] if metric == 'Ocasiones Atz' else \
-                            row['ocasiones_rival'] if metric == 'Ocasiones Rival' else \
-                            row['dif_ocasiones']
+                    valor = row['ocas_atz'] if metric == 'Ocas Atz' else \
+                            row['ocas_rival'] if metric == 'Ocas Rival' else \
+                            row['dif_ocas']
                     if valor is None:
                         valor = 0
                     metric_row[columna_id] = f"{int(valor)}"  # Sin decimales
                     
                     # Estilos específicos para ocasiones
                     color = 'rgb(200, 200, 200)'  # Color neutral por defecto
-                    if metric == 'Dif Ocasiones':
+                    if metric == 'Dif Ocas':
                         color = 'rgb(0, 255, 0)' if valor > 0 else 'rgb(255, 0, 0)' if valor < 0 else 'rgb(200, 200, 200)'
                     
                     style_conditions.append({
@@ -299,7 +299,7 @@ def create_evolution_table():
                 # Después de cada 5 partidos, añadir la media
                 if len(partidos_grupo) == 5:
                     columnas_orden.extend(partidos_grupo)
-                    if metric in ['Ocasiones Atz', 'Ocasiones Rival', 'Dif Ocasiones']:
+                    if metric in ['Ocas Atz', 'Ocas Rival', 'Dif Ocas']:
                         valores = [float(metric_row[col]) for col in partidos_grupo]
                         media = sum(valores) / len(valores)
                         media_col = f'Media {len(columnas_orden)//5}'
@@ -315,7 +315,7 @@ def create_evolution_table():
             # Procesar últimos partidos si quedan
             if partidos_grupo:
                 columnas_orden.extend(partidos_grupo)
-                if metric in ['Ocasiones Atz', 'Ocasiones Rival', 'Dif Ocasiones']:
+                if metric in ['Ocas Atz', 'Ocas Rival', 'Dif Ocas']:
                     valores = [float(metric_row[col]) for col in partidos_grupo]
                     media = sum(valores) / len(valores)
                     media_col = f'Media {(len(columnas_orden)-len(partidos_grupo))//5 + 1}'
@@ -332,7 +332,7 @@ def create_evolution_table():
             for columna in metric_row.keys():
                 if columna not in ['Métrica', 'Media Total']:
                     try:
-                        if metric in ['Ocasiones Atz', 'Ocasiones Rival', 'Dif Ocasiones']:
+                        if metric in ['Ocas Atz', 'Ocas Rival', 'Dif Ocas']:
                             valores_totales.append(float(metric_row[columna]))
                         else:
                             valores_totales.append(float(metric_row[columna].strip('%')))
@@ -341,7 +341,7 @@ def create_evolution_table():
 
             if valores_totales:
                 media_total = sum(valores_totales) / len(valores_totales)
-                if metric in ['Ocasiones Atz', 'Ocasiones Rival', 'Dif Ocasiones']:
+                if metric in ['Ocas Atz', 'Ocas Rival', 'Dif Ocas']:
                     metric_row['Media Total'] = f"{int(round(media_total))}"
                 else:
                     metric_row['Media Total'] = f"{media_total:.2f}%"
@@ -658,7 +658,7 @@ def update_table_data(n_intervals):
             fecha_display = row['fecha_parsed'].strftime('%d/%m/%Y')
             return f"{desc}\n{tipo}{row['match_number']}\n({fecha_display})"
 
-        for metric in ['BLP %', 'BLR %', 'PTP %', 'RET %', 'OC %', 'VD %', 'Ocasiones Atz', 'Ocasiones Rival', 'Dif Ocasiones']:
+        for metric in ['BLP %', 'BLR %', 'PTP %', 'RET %', 'OC %', 'VD %', 'Ocas Atz', 'Ocas Rival', 'Dif Ocas']:
             metric_row = {'Métrica': metric}
             columnas_orden = []
             partidos_grupo = []
@@ -669,18 +669,18 @@ def update_table_data(n_intervals):
                 fecha_display = row['fecha_parsed'].strftime('%d/%m/%Y')
                 columna_id = f"{row['fecha_parsed'].strftime('%Y%m%d')}_{tipo}{row['match_number']}"
                 
-                if metric in ['Ocasiones Atz', 'Ocasiones Rival', 'Dif Ocasiones']:
+                if metric in ['Ocas Atz', 'Ocas Rival', 'Dif Ocas']:
                     # Para métricas de ocasiones, usar el valor directamente
-                    valor = row['ocasiones_atz'] if metric == 'Ocasiones Atz' else \
-                        row['ocasiones_rival'] if metric == 'Ocasiones Rival' else \
-                        row['dif_ocasiones']
+                    valor = row['ocas atz'] if metric == 'Ocas Atz' else \
+                        row['ocas_rival'] if metric == 'Ocas Rival' else \
+                        row['dif_ocas']
                     if valor is None:
                         valor = 0
                     metric_row[columna_id] = f"{int(valor)}"  # Sin decimales
                     
                     # Estilos específicos para ocasiones
                     color = 'rgb(200, 200, 200)'  # Color neutral por defecto
-                    if metric == 'Dif Ocasiones':
+                    if metric == 'Dif Ocas':
                         color = 'rgb(0, 255, 0)' if valor > 0 else 'rgb(255, 0, 0)' if valor < 0 else 'rgb(200, 200, 200)'
                     
                     style_conditions.append({
@@ -729,7 +729,7 @@ def update_table_data(n_intervals):
                 # Después de cada 5 partidos
                 if len(partidos_grupo) == 5:
                     columnas_orden.extend(partidos_grupo)
-                    if metric in ['Ocasiones Atz', 'Ocasiones Rival', 'Dif Ocasiones']:
+                    if metric in ['Ocas Atz', 'Ocas Rival', 'Dif Ocas']:
                         valores = [float(metric_row[col]) for col in partidos_grupo]
                         media = sum(valores) / len(valores)
                         media_col = f'Media {len(columnas_orden)//5}'
