@@ -46,151 +46,163 @@ def execute_query(query, params=None):
 
 # Función para obtener datos
 def get_all_matches_data():
-    query = """
-    WITH MatchStats AS (
-        SELECT 
-            `match`,
-            STR_TO_DATE(fecha, '%d/%m/%Y') as fecha_parsed,
-            fecha as fecha_original,
-            team,
-            idcode,
-            idgroup,
-            idtext,
-            descripcion,
-            CASE 
-                WHEN SUBSTRING(`match`, 1, 1) = 'J' THEN 'Liga'
-                WHEN SUBSTRING(`match`, 1, 1) = 'C' THEN 'Copa'
-            END as match_type,
-            CASE
-                WHEN SUBSTRING(`match`, 1, 1) = 'J' THEN CAST(SUBSTRING(`match`, 2) AS SIGNED)
-                WHEN SUBSTRING(`match`, 1, 1) = 'C' THEN CAST(SUBSTRING(`match`, 2) AS SIGNED)
-            END as match_number
-        FROM bot_events
-        WHERE SUBSTRING(`match`, 1, 1) IN ('J', 'C')
-    ),
-    BallPossession AS (
-        SELECT 
-            ms.`match`,
-            ms.fecha_parsed,
-            ms.fecha_original,
-            ms.match_type,
-            ms.match_number,
-            MAX(ms.descripcion) as descripcion,
-            -- BLP (Balón Largo Propio)
-            COUNT(CASE WHEN ms.idcode = 'Tras balon largo propio' 
-                      AND ms.idgroup = '2ª jugada'
-                      AND ms.idtext = 'Ganada'
-                      AND ms.team = 'UD Atzeneta' THEN 1 END) as won_balls_blp,
-            COUNT(CASE WHEN ms.idcode = 'Tras balon largo propio'
-                      AND ms.idgroup = '2ª jugada'
-                      AND ms.idtext = 'Perdida'
-                      AND ms.team = 'UD Atzeneta' THEN 1 END) as lost_balls_blp,
-            COUNT(CASE WHEN ms.idcode = 'Tras balon largo propio'
-                      AND ms.idgroup = '2ª jugada'
-                      AND ms.team = 'UD Atzeneta' THEN 1 END) as total_balls_blp,
-            -- BLR (Balón Largo Rival)
-            COUNT(CASE WHEN ms.idcode = 'Tras balon largo rival' 
-                      AND ms.idgroup = '2ª jugada'
-                      AND ms.idtext = 'Ganada'
-                      AND ms.team != 'UD Atzeneta' THEN 1 END) as won_balls_blr,
-            COUNT(CASE WHEN ms.idcode = 'Tras balon largo rival'
-                      AND ms.idgroup = '2ª jugada'
-                      AND ms.idtext = 'Perdida'
-                      AND ms.team != 'UD Atzeneta' THEN 1 END) as lost_balls_blr,
-            COUNT(CASE WHEN ms.idcode = 'Tras balon largo rival'
-                      AND ms.idgroup = '2ª jugada'
-                      AND ms.team != 'UD Atzeneta' THEN 1 END) as total_balls_blr,
-            -- PTP (Presión Tras Pérdida)
-            COUNT(CASE WHEN ms.idcode = 'Presión tras perdida' 
-                      AND ms.idgroup = 'Presión conjunta'
-                      AND ms.idtext = 'Si'
-                      AND ms.team = 'UD Atzeneta' THEN 1 END) as success_ptp,
-            COUNT(CASE WHEN ms.idcode = 'Presión tras perdida'
-                      AND ms.idgroup = 'Presión conjunta'
-                      AND ms.idtext = 'No'
-                      AND ms.team = 'UD Atzeneta' THEN 1 END) as fail_ptp,
-            COUNT(CASE WHEN ms.idcode = 'Presión tras perdida'
-                      AND ms.idgroup = 'Presión conjunta'
-                      AND ms.team = 'UD Atzeneta' THEN 1 END) as total_ptp,
-            -- RET (Retornos)
-            COUNT(CASE WHEN ms.idcode = 'Retornos' 
-                      AND ms.idgroup = 'Retorno conjunto'
-                      AND ms.idtext = 'Si'
-                      AND ms.team = 'UD Atzeneta' THEN 1 END) as success_ret,
-            COUNT(CASE WHEN ms.idcode = 'Retornos'
-                      AND ms.idgroup = 'Retorno conjunto'
-                      AND ms.idtext = 'No'
-                      AND ms.team = 'UD Atzeneta' THEN 1 END) as fail_ret,
-            COUNT(CASE WHEN ms.idcode = 'Retornos'
-                      AND ms.idgroup = 'Retorno conjunto'
-                      AND ms.team = 'UD Atzeneta' THEN 1 END) as total_ret,
-            -- OC (Ocupación de Centros)
-            COUNT(CASE WHEN ms.idcode = 'Ocupación del área centros' 
-                      AND ms.idgroup = 'Buena ocupación'
-                      AND ms.idtext = 'Si'
-                      AND ms.team = 'UD Atzeneta' THEN 1 END) as success_oc,
-            COUNT(CASE WHEN ms.idcode = 'Ocupación del área centros'
-                      AND ms.idgroup = 'Buena ocupación'
-                      AND ms.idtext = 'No'
-                      AND ms.team = 'UD Atzeneta' THEN 1 END) as fail_oc,
-            COUNT(CASE WHEN ms.idcode = 'Ocupación del área centros'
-                      AND ms.idgroup = 'Buena ocupación'
-                      AND ms.team = 'UD Atzeneta' THEN 1 END) as total_oc,
-            -- VD (Vigilancias Defensivas)
-            COUNT(CASE WHEN ms.idcode = 'Vigilancias Defensivas' 
-                      AND ms.idgroup = 'Rivales controlados'
-                      AND ms.idtext = 'Si'
-                      AND ms.team = 'UD Atzeneta' THEN 1 END) as success_vd,
-            COUNT(CASE WHEN ms.idcode = 'Vigilancias Defensivas'
-                      AND ms.idgroup = 'Rivales controlados'
-                      AND ms.idtext = 'No'
-                      AND ms.team = 'UD Atzeneta' THEN 1 END) as fail_vd,
-            COUNT(CASE WHEN ms.idcode = 'Vigilancias Defensivas'
-                      AND ms.idgroup = 'Rivales controlados'
-                      AND ms.team = 'UD Atzeneta' THEN 1 END) as total_vd
-        FROM MatchStats ms
-        GROUP BY ms.`match`, ms.fecha_parsed, ms.fecha_original, ms.match_type, ms.match_number
-    )
-    SELECT 
-        `match`,
-        fecha_original as fecha,
-        descripcion,
-        match_type,
-        match_number,
-        -- BLP stats
-        won_balls_blp,
-        lost_balls_blp,
-        total_balls_blp,
-        ROUND((won_balls_blp * 100.0) / NULLIF(total_balls_blp, 0), 2) as blp_percentage,
-        -- BLR stats
-        won_balls_blr,
-        lost_balls_blr,
-        total_balls_blr,
-        ROUND((won_balls_blr * 100.0) / NULLIF(total_balls_blr, 0), 2) as blr_percentage,
-        -- PTP stats
-        success_ptp,
-        fail_ptp,
-        total_ptp,
-        ROUND((success_ptp * 100.0) / NULLIF(total_ptp, 0), 2) as ptp_percentage,
-        -- RET stats
-        success_ret,
-        fail_ret,
-        total_ret,
-        ROUND((success_ret * 100.0) / NULLIF(total_ret, 0), 2) as ret_percentage,
-        -- OC stats
-        success_oc,
-        fail_oc,
-        total_oc,
-        ROUND((success_oc * 100.0) / NULLIF(total_oc, 0), 2) as oc_percentage,
-        -- VD stats
-        success_vd,
-        fail_vd,
-        total_vd,
-        ROUND((success_vd * 100.0) / NULLIF(total_vd, 0), 2) as vd_percentage
-    FROM BallPossession
-    ORDER BY fecha_parsed ASC;
-    """
-    return execute_query(query)
+   query = """
+   WITH MatchStats AS (
+       SELECT 
+           `match`,
+           STR_TO_DATE(fecha, '%d/%m/%Y') as fecha_parsed,
+           fecha as fecha_original,
+           team,
+           idcode,
+           idgroup,
+           idtext,
+           descripcion,
+           CASE 
+               WHEN SUBSTRING(`match`, 1, 1) = 'J' THEN 'Liga'
+               WHEN SUBSTRING(`match`, 1, 1) = 'C' THEN 'Copa'
+           END as match_type,
+           CASE
+               WHEN SUBSTRING(`match`, 1, 1) = 'J' THEN CAST(SUBSTRING(`match`, 2) AS SIGNED)
+               WHEN SUBSTRING(`match`, 1, 1) = 'C' THEN CAST(SUBSTRING(`match`, 2) AS SIGNED)
+           END as match_number
+       FROM bot_events
+       WHERE SUBSTRING(`match`, 1, 1) IN ('J', 'C')
+   ),
+   BallPossession AS (
+       SELECT 
+           ms.`match`,
+           ms.fecha_parsed,
+           ms.fecha_original,
+           ms.match_type,
+           ms.match_number,
+           MAX(ms.descripcion) as descripcion,
+           -- BLP (Balón Largo Propio)
+           COUNT(CASE WHEN ms.idcode = 'Tras balon largo propio' 
+                     AND ms.idgroup = '2ª jugada'
+                     AND ms.idtext = 'Ganada'
+                     AND ms.team = 'UD Atzeneta' THEN 1 END) as won_balls_blp,
+           COUNT(CASE WHEN ms.idcode = 'Tras balon largo propio'
+                     AND ms.idgroup = '2ª jugada'
+                     AND ms.idtext = 'Perdida'
+                     AND ms.team = 'UD Atzeneta' THEN 1 END) as lost_balls_blp,
+           COUNT(CASE WHEN ms.idcode = 'Tras balon largo propio'
+                     AND ms.idgroup = '2ª jugada'
+                     AND ms.team = 'UD Atzeneta' THEN 1 END) as total_balls_blp,
+           -- BLR (Balón Largo Rival)
+           COUNT(CASE WHEN ms.idcode = 'Tras balon largo rival' 
+                     AND ms.idgroup = '2ª jugada'
+                     AND ms.idtext = 'Ganada'
+                     AND ms.team != 'UD Atzeneta' THEN 1 END) as won_balls_blr,
+           COUNT(CASE WHEN ms.idcode = 'Tras balon largo rival'
+                     AND ms.idgroup = '2ª jugada'
+                     AND ms.idtext = 'Perdida'
+                     AND ms.team != 'UD Atzeneta' THEN 1 END) as lost_balls_blr,
+           COUNT(CASE WHEN ms.idcode = 'Tras balon largo rival'
+                     AND ms.idgroup = '2ª jugada'
+                     AND ms.team != 'UD Atzeneta' THEN 1 END) as total_balls_blr,
+           -- PTP (Presión Tras Pérdida)
+           COUNT(CASE WHEN ms.idcode = 'Presión tras perdida' 
+                     AND ms.idgroup = 'Presión conjunta'
+                     AND ms.idtext = 'Si'
+                     AND ms.team = 'UD Atzeneta' THEN 1 END) as success_ptp,
+           COUNT(CASE WHEN ms.idcode = 'Presión tras perdida'
+                     AND ms.idgroup = 'Presión conjunta'
+                     AND ms.idtext = 'No'
+                     AND ms.team = 'UD Atzeneta' THEN 1 END) as fail_ptp,
+           COUNT(CASE WHEN ms.idcode = 'Presión tras perdida'
+                     AND ms.idgroup = 'Presión conjunta'
+                     AND ms.team = 'UD Atzeneta' THEN 1 END) as total_ptp,
+           -- RET (Retornos)
+           COUNT(CASE WHEN ms.idcode = 'Retornos' 
+                     AND ms.idgroup = 'Retorno conjunto'
+                     AND ms.idtext = 'Si'
+                     AND ms.team = 'UD Atzeneta' THEN 1 END) as success_ret,
+           COUNT(CASE WHEN ms.idcode = 'Retornos'
+                     AND ms.idgroup = 'Retorno conjunto'
+                     AND ms.idtext = 'No'
+                     AND ms.team = 'UD Atzeneta' THEN 1 END) as fail_ret,
+           COUNT(CASE WHEN ms.idcode = 'Retornos'
+                     AND ms.idgroup = 'Retorno conjunto'
+                     AND ms.team = 'UD Atzeneta' THEN 1 END) as total_ret,
+           -- OC (Ocupación de Centros)
+           COUNT(CASE WHEN ms.idcode = 'Ocupación del área centros' 
+                     AND ms.idgroup = 'Buena ocupación'
+                     AND ms.idtext = 'Si'
+                     AND ms.team = 'UD Atzeneta' THEN 1 END) as success_oc,
+           COUNT(CASE WHEN ms.idcode = 'Ocupación del área centros'
+                     AND ms.idgroup = 'Buena ocupación'
+                     AND ms.idtext = 'No'
+                     AND ms.team = 'UD Atzeneta' THEN 1 END) as fail_oc,
+           COUNT(CASE WHEN ms.idcode = 'Ocupación del área centros'
+                     AND ms.idgroup = 'Buena ocupación'
+                     AND ms.team = 'UD Atzeneta' THEN 1 END) as total_oc,
+           -- VD (Vigilancias Defensivas)
+           COUNT(CASE WHEN ms.idcode = 'Vigilancias Defensivas' 
+                     AND ms.idgroup = 'Rivales controlados'
+                     AND ms.idtext = 'Si'
+                     AND ms.team = 'UD Atzeneta' THEN 1 END) as success_vd,
+           COUNT(CASE WHEN ms.idcode = 'Vigilancias Defensivas'
+                     AND ms.idgroup = 'Rivales controlados'
+                     AND ms.idtext = 'No'
+                     AND ms.team = 'UD Atzeneta' THEN 1 END) as fail_vd,
+           COUNT(CASE WHEN ms.idcode = 'Vigilancias Defensivas'
+                     AND ms.idgroup = 'Rivales controlados'
+                     AND ms.team = 'UD Atzeneta' THEN 1 END) as total_vd,
+           -- Ocasiones Atz
+           COUNT(CASE WHEN ms.idcode = 'Xg' 
+                   AND ms.idtext IN ('Ocasión clarisima', 'Ocasión Clara', 'Remate sin importancia')
+                   AND ms.team = 'UD Atzeneta' THEN 1 END) as ocasiones_atz,
+           -- Ocasiones Rival
+           COUNT(CASE WHEN ms.idcode = 'Xg' 
+                   AND ms.idtext IN ('Ocasión clarisima', 'Ocasión Clara', 'Remate sin importancia')
+                   AND ms.team != 'UD Atzeneta' THEN 1 END) as ocasiones_rival
+       FROM MatchStats ms
+       GROUP BY ms.`match`, ms.fecha_parsed, ms.fecha_original, ms.match_type, ms.match_number
+   )
+   SELECT 
+       `match`,
+       fecha_original as fecha,
+       descripcion,
+       match_type,
+       match_number,
+       -- BLP stats
+       won_balls_blp,
+       lost_balls_blp,
+       total_balls_blp,
+       ROUND((won_balls_blp * 100.0) / NULLIF(total_balls_blp, 0), 2) as blp_percentage,
+       -- BLR stats
+       won_balls_blr,
+       lost_balls_blr,
+       total_balls_blr,
+       ROUND((won_balls_blr * 100.0) / NULLIF(total_balls_blr, 0), 2) as blr_percentage,
+       -- PTP stats
+       success_ptp,
+       fail_ptp,
+       total_ptp,
+       ROUND((success_ptp * 100.0) / NULLIF(total_ptp, 0), 2) as ptp_percentage,
+       -- RET stats
+       success_ret,
+       fail_ret,
+       total_ret,
+       ROUND((success_ret * 100.0) / NULLIF(total_ret, 0), 2) as ret_percentage,
+       -- OC stats
+       success_oc,
+       fail_oc,
+       total_oc,
+       ROUND((success_oc * 100.0) / NULLIF(total_oc, 0), 2) as oc_percentage,
+       -- VD stats
+       success_vd,
+       fail_vd,
+       total_vd,
+       ROUND((success_vd * 100.0) / NULLIF(total_vd, 0), 2) as vd_percentage,
+       -- Ocasiones stats
+       ocasiones_atz,
+       ocasiones_rival,
+       (ocasiones_atz - ocasiones_rival) as dif_ocasiones
+   FROM BallPossession
+   ORDER BY fecha_parsed ASC;
+   """
+   return execute_query(query)
 
 def create_evolution_table():
     # Obtener datos
@@ -213,7 +225,7 @@ def create_evolution_table():
             fecha_display = row['fecha_parsed'].strftime('%d/%m/%Y')
             return f"{desc}\n{tipo}{row['match_number']}\n({fecha_display})"
 
-        for metric in ['BLP %', 'BLR %', 'PTP %', 'RET %', 'OC %', 'VD %']:
+        for metric in ['BLP %', 'BLR %', 'PTP %', 'RET %', 'OC %', 'VD %', 'Ocasiones Atz', 'Ocasiones Rival', 'Dif Ocasiones']:
             metric_row = {'Métrica': metric}
             columnas_orden = []
             partidos_grupo = []
@@ -225,35 +237,57 @@ def create_evolution_table():
                 # Crear ID de columna que incluya la fecha para mantener el orden
                 columna_id = f"{row['fecha_parsed'].strftime('%Y%m%d')}_{tipo}{row['match_number']}"
                 
-                # Seleccionar el porcentaje según la métrica
-                if metric == 'BLP %':
-                    porcentaje = row['blp_percentage']
-                elif metric == 'BLR %':
-                    porcentaje = row['blr_percentage']
-                elif metric == 'PTP %':
-                    porcentaje = row['ptp_percentage']
-                elif metric == 'RET %':
-                    porcentaje = row['ret_percentage']
-                elif metric == 'OC %':
-                    porcentaje = row['oc_percentage']
-                else:  # VD %
-                    porcentaje = row['vd_percentage']
+                if metric in ['Ocasiones Atz', 'Ocasiones Rival', 'Dif Ocasiones']:
+                    # Para métricas de ocasiones, usar el valor directamente
+                    valor = row['ocasiones_atz'] if metric == 'Ocasiones Atz' else \
+                            row['ocasiones_rival'] if metric == 'Ocasiones Rival' else \
+                            row['dif_ocasiones']
+                    if valor is None:
+                        valor = 0
+                    metric_row[columna_id] = f"{int(valor)}"  # Sin decimales
+                    
+                    # Estilos específicos para ocasiones
+                    color = 'rgb(200, 200, 200)'  # Color neutral por defecto
+                    if metric == 'Dif Ocasiones':
+                        color = 'rgb(0, 255, 0)' if valor > 0 else 'rgb(255, 0, 0)' if valor < 0 else 'rgb(200, 200, 200)'
+                    
+                    style_conditions.append({
+                        'if': {
+                            'column_id': columna_id,
+                            'filter_query': '{Métrica} = "' + metric + '"'
+                        },
+                        'backgroundColor': color,
+                        'color': 'black'
+                    })
+                else:
+                    # El código existente para métricas de porcentaje
+                    if metric == 'BLP %':
+                        porcentaje = row['blp_percentage']
+                    elif metric == 'BLR %':
+                        porcentaje = row['blr_percentage']
+                    elif metric == 'PTP %':
+                        porcentaje = row['ptp_percentage']
+                    elif metric == 'RET %':
+                        porcentaje = row['ret_percentage']
+                    elif metric == 'OC %':
+                        porcentaje = row['oc_percentage']
+                    else:  # VD %
+                        porcentaje = row['vd_percentage']
+                    
+                    if porcentaje is None:
+                        porcentaje = 0
+                    
+                    metric_row[columna_id] = f"{float(porcentaje):.2f}%"
+                    style_conditions.append({
+                        'if': {
+                            'column_id': columna_id,
+                            'filter_query': '{Métrica} = "' + metric + '"'
+                        },
+                        'backgroundColor': get_color_scale(float(porcentaje)),
+                        'color': 'white' if float(porcentaje) > 40 else 'black'
+                    })
                 
-                if porcentaje is None:
-                    porcentaje = 0
-                
-                metric_row[columna_id] = f"{float(porcentaje):.2f}%"
                 partidos_grupo.append(columna_id)
-                
-                # Estilos
-                style_conditions.append({
-                    'if': {
-                        'column_id': columna_id,
-                        'filter_query': '{Métrica} = "' + metric + '"'
-                    },
-                    'backgroundColor': get_color_scale(float(porcentaje)),
-                    'color': 'white' if float(porcentaje) > 40 else 'black'
-                })
                 
                 header_styles.append({
                     'if': {'column_id': columna_id},
@@ -261,38 +295,56 @@ def create_evolution_table():
                     'font-size': '10px'
                 })
                 
+                
                 # Después de cada 5 partidos, añadir la media
                 if len(partidos_grupo) == 5:
                     columnas_orden.extend(partidos_grupo)
-                    valores = [float(metric_row[col].strip('%')) for col in partidos_grupo]
-                    media = sum(valores) / len(valores)
-                    media_col = f'Media {len(columnas_orden)//5}'
-                    metric_row[media_col] = f"{media:.2f}%"
+                    if metric in ['Ocasiones Atz', 'Ocasiones Rival', 'Dif Ocasiones']:
+                        valores = [float(metric_row[col]) for col in partidos_grupo]
+                        media = sum(valores) / len(valores)
+                        media_col = f'Media {len(columnas_orden)//5}'
+                        metric_row[media_col] = f"{int(round(media))}"
+                    else:
+                        valores = [float(metric_row[col].strip('%')) for col in partidos_grupo]
+                        media = sum(valores) / len(valores)
+                        media_col = f'Media {len(columnas_orden)//5}'
+                        metric_row[media_col] = f"{media:.2f}%"
                     columnas_orden.append(media_col)
                     partidos_grupo = []
             
             # Procesar últimos partidos si quedan
             if partidos_grupo:
                 columnas_orden.extend(partidos_grupo)
-                valores = [float(metric_row[col].strip('%')) for col in partidos_grupo]
-                media = sum(valores) / len(valores)
-                media_col = f'Media {(len(columnas_orden)-len(partidos_grupo))//5 + 1}'
-                metric_row[media_col] = f"{media:.2f}%"
+                if metric in ['Ocasiones Atz', 'Ocasiones Rival', 'Dif Ocasiones']:
+                    valores = [float(metric_row[col]) for col in partidos_grupo]
+                    media = sum(valores) / len(valores)
+                    media_col = f'Media {(len(columnas_orden)-len(partidos_grupo))//5 + 1}'
+                    metric_row[media_col] = f"{int(round(media))}"
+                else:
+                    valores = [float(metric_row[col].strip('%')) for col in partidos_grupo]
+                    media = sum(valores) / len(valores)
+                    media_col = f'Media {(len(columnas_orden)-len(partidos_grupo))//5 + 1}'
+                    metric_row[media_col] = f"{media:.2f}%"
                 columnas_orden.append(media_col)
-            
+
             # Media total
             valores_totales = []
             for columna in metric_row.keys():
                 if columna not in ['Métrica', 'Media Total']:
                     try:
-                        porcentaje = float(metric_row[columna].strip('%'))
-                        valores_totales.append(porcentaje)
+                        if metric in ['Ocasiones Atz', 'Ocasiones Rival', 'Dif Ocasiones']:
+                            valores_totales.append(float(metric_row[columna]))
+                        else:
+                            valores_totales.append(float(metric_row[columna].strip('%')))
                     except (ValueError, AttributeError):
                         continue
 
             if valores_totales:
                 media_total = sum(valores_totales) / len(valores_totales)
-                metric_row['Media Total'] = f"{media_total:.2f}%"
+                if metric in ['Ocasiones Atz', 'Ocasiones Rival', 'Dif Ocasiones']:
+                    metric_row['Media Total'] = f"{int(round(media_total))}"
+                else:
+                    metric_row['Media Total'] = f"{media_total:.2f}%"
                 columnas_orden.append('Media Total')
             
             metrics_rows.append(metric_row)
@@ -606,7 +658,7 @@ def update_table_data(n_intervals):
             fecha_display = row['fecha_parsed'].strftime('%d/%m/%Y')
             return f"{desc}\n{tipo}{row['match_number']}\n({fecha_display})"
 
-        for metric in ['BLP %', 'BLR %', 'PTP %', 'RET %', 'OC %', 'VD %']:
+        for metric in ['BLP %', 'BLR %', 'PTP %', 'RET %', 'OC %', 'VD %', 'Ocasiones Atz', 'Ocasiones Rival', 'Dif Ocasiones']:
             metric_row = {'Métrica': metric}
             columnas_orden = []
             partidos_grupo = []
@@ -617,49 +669,76 @@ def update_table_data(n_intervals):
                 fecha_display = row['fecha_parsed'].strftime('%d/%m/%Y')
                 columna_id = f"{row['fecha_parsed'].strftime('%Y%m%d')}_{tipo}{row['match_number']}"
                 
-                # Seleccionar el porcentaje según la métrica
-                if metric == 'BLP %':
-                    porcentaje = row['blp_percentage']
-                elif metric == 'BLR %':
-                    porcentaje = row['blr_percentage']
-                elif metric == 'PTP %':
-                    porcentaje = row['ptp_percentage']
-                elif metric == 'RET %':
-                    porcentaje = row['ret_percentage']
-                elif metric == 'OC %':
-                    porcentaje = row['oc_percentage']
-                else:  # VD %
-                    porcentaje = row['vd_percentage']
+                if metric in ['Ocasiones Atz', 'Ocasiones Rival', 'Dif Ocasiones']:
+                    # Para métricas de ocasiones, usar el valor directamente
+                    valor = row['ocasiones_atz'] if metric == 'Ocasiones Atz' else \
+                        row['ocasiones_rival'] if metric == 'Ocasiones Rival' else \
+                        row['dif_ocasiones']
+                    if valor is None:
+                        valor = 0
+                    metric_row[columna_id] = f"{int(valor)}"  # Sin decimales
+                    
+                    # Estilos específicos para ocasiones
+                    color = 'rgb(200, 200, 200)'  # Color neutral por defecto
+                    if metric == 'Dif Ocasiones':
+                        color = 'rgb(0, 255, 0)' if valor > 0 else 'rgb(255, 0, 0)' if valor < 0 else 'rgb(200, 200, 200)'
+                    
+                    style_conditions.append({
+                        'if': {
+                            'column_id': columna_id,
+                            'filter_query': '{Métrica} = "' + metric + '"'
+                        },
+                        'backgroundColor': color,
+                        'color': 'black'
+                    })
+                else:
+                    # El código existente para métricas de porcentaje
+                    if metric == 'BLP %':
+                        porcentaje = row['blp_percentage']
+                    elif metric == 'BLR %':
+                        porcentaje = row['blr_percentage']
+                    elif metric == 'PTP %':
+                        porcentaje = row['ptp_percentage']
+                    elif metric == 'RET %':
+                        porcentaje = row['ret_percentage']
+                    elif metric == 'OC %':
+                        porcentaje = row['oc_percentage']
+                    else:  # VD %
+                        porcentaje = row['vd_percentage']
+                    
+                    if porcentaje is None:
+                        porcentaje = 0
+                    
+                    metric_row[columna_id] = f"{float(porcentaje):.2f}%"
+                    style_conditions.append({
+                        'if': {
+                            'column_id': columna_id,
+                            'filter_query': '{Métrica} = "' + metric + '"'
+                        },
+                        'backgroundColor': get_color_scale(float(porcentaje)),
+                        'color': 'white' if float(porcentaje) > 40 else 'black'
+                    })
                 
-                if porcentaje is None:
-                    porcentaje = 0
-                
-                metric_row[columna_id] = f"{float(porcentaje):.2f}%"
                 partidos_grupo.append(columna_id)
-                
-                # Estilos
-                style_conditions.append({
-                    'if': {
-                        'column_id': columna_id,
-                        'filter_query': '{Métrica} = "' + metric + '"'
-                    },
-                    'backgroundColor': get_color_scale(float(porcentaje)),
-                    'color': 'white' if float(porcentaje) > 40 else 'black'
-                })
-                
                 header_styles.append({
                     'if': {'column_id': columna_id},
                     'backgroundColor': 'rgba(135, 206, 235, 0.7)' if tipo == 'J' else 'rgba(255, 165, 0, 0.7)',
                     'font-size': '10px'
                 })
                 
-                # Después de cada 5 partidos, añadir la media
+                # Después de cada 5 partidos
                 if len(partidos_grupo) == 5:
                     columnas_orden.extend(partidos_grupo)
-                    valores = [float(metric_row[col].strip('%')) for col in partidos_grupo]
-                    media = sum(valores) / len(valores)
-                    media_col = f'Media {len(columnas_orden)//5}'
-                    metric_row[media_col] = f"{media:.2f}%"
+                    if metric in ['Ocasiones Atz', 'Ocasiones Rival', 'Dif Ocasiones']:
+                        valores = [float(metric_row[col]) for col in partidos_grupo]
+                        media = sum(valores) / len(valores)
+                        media_col = f'Media {len(columnas_orden)//5}'
+                        metric_row[media_col] = f"{int(round(media))}"
+                    else:
+                        valores = [float(metric_row[col].strip('%')) for col in partidos_grupo]
+                        media = sum(valores) / len(valores)
+                        media_col = f'Media {len(columnas_orden)//5}'
+                        metric_row[media_col] = f"{media:.2f}%"
                     columnas_orden.append(media_col)
                     partidos_grupo = []
             
