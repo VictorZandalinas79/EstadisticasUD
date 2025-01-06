@@ -319,7 +319,7 @@ def create_evolution_table():
                     valores = [float(metric_row[col]) for col in partidos_grupo]
                     media = sum(valores) / len(valores)
                     media_col = f'Media {(len(columnas_orden)-len(partidos_grupo))//5 + 1}'
-                    metric_row[media_col] = f"{int(round(media))}"
+                    metric_row[media_col] = f"{int(round(media))}"  # Sin % para ocasiones
                 else:
                     valores = [float(metric_row[col].strip('%')) for col in partidos_grupo]
                     media = sum(valores) / len(valores)
@@ -342,7 +342,7 @@ def create_evolution_table():
             if valores_totales:
                 media_total = sum(valores_totales) / len(valores_totales)
                 if metric in ['Ocas Atz', 'Ocas Rival', 'Dif Ocas']:
-                    metric_row['Media Total'] = f"{int(round(media_total))}"
+                    metric_row['Media Total'] = f"{int(round(media_total))}"  # Sin % para ocasiones
                 else:
                     metric_row['Media Total'] = f"{media_total:.2f}%"
                 columnas_orden.append('Media Total')
@@ -427,6 +427,40 @@ def get_color_scale(value):
         red = 255
         green = max(0, int(165 * (value / 60)))
         return f'rgb({red}, {green}, 0)'
+
+def get_color_scale_ocasiones(value, is_rival=False):
+    """
+    Retorna un color basado en el valor de las ocasiones:
+    Para Ocas Atz y Dif Ocas:
+    - Rojo para valores <= 0
+    - Naranja para valores entre 1 y 4
+    - Verde (más intenso cuanto más alto) para valores >= 5
+    
+    Para Ocas Rival (invertido):
+    - Verde para valores <= 0
+    - Naranja para valores entre 1 y 4
+    - Rojo (más intenso cuanto más alto) para valores >= 5
+    """
+    if is_rival:
+        # Escala invertida para ocasiones del rival
+        if value <= 0:
+            return 'rgb(0, 255, 0)'  # Verde
+        elif value < 5:
+            return 'rgb(255, 165, 0)'  # Naranja
+        else:
+            # Escala de rojo: más intenso cuanto más alto sea el valor
+            intensity = min(255, int(150 + (value * 10)))
+            return f'rgb({intensity}, 0, 0)'
+    else:
+        # Escala normal para ocasiones propias y diferencia
+        if value <= 0:
+            return 'rgb(255, 0, 0)'  # Rojo
+        elif value < 5:
+            return 'rgb(255, 165, 0)'  # Naranja
+        else:
+            # Escala de verde: más intenso cuanto más alto sea el valor
+            intensity = min(255, int(150 + (value * 10)))
+            return f'rgb(0, {intensity}, 0)'
     
 def generar_analisis_kpis(df):
     insights = []
@@ -671,25 +705,23 @@ def update_table_data(n_intervals):
                 
                 if metric in ['Ocas Atz', 'Ocas Rival', 'Dif Ocas']:
                     # Para métricas de ocasiones, usar el valor directamente
-                    valor = row['ocas atz'] if metric == 'Ocas Atz' else \
+                    valor = row['ocas_atz'] if metric == 'Ocas Atz' else \
                         row['ocas_rival'] if metric == 'Ocas Rival' else \
                         row['dif_ocas']
                     if valor is None:
                         valor = 0
                     metric_row[columna_id] = f"{int(valor)}"  # Sin decimales
                     
-                    # Estilos específicos para ocasiones
-                    color = 'rgb(200, 200, 200)'  # Color neutral por defecto
-                    if metric == 'Dif Ocas':
-                        color = 'rgb(0, 255, 0)' if valor > 0 else 'rgb(255, 0, 0)' if valor < 0 else 'rgb(200, 200, 200)'
+                    # Determinar si es la métrica del rival
+                    is_rival = metric == 'Ocas Rival'
                     
                     style_conditions.append({
                         'if': {
                             'column_id': columna_id,
                             'filter_query': '{Métrica} = "' + metric + '"'
                         },
-                        'backgroundColor': color,
-                        'color': 'black'
+                        'backgroundColor': get_color_scale_ocasiones(float(valor), is_rival),
+                        'color': 'white' if float(valor) >= 1 else 'black'
                     })
                 else:
                     # El código existente para métricas de porcentaje
@@ -745,10 +777,16 @@ def update_table_data(n_intervals):
             # Procesar últimos partidos si quedan
             if partidos_grupo:
                 columnas_orden.extend(partidos_grupo)
-                valores = [float(metric_row[col].strip('%')) for col in partidos_grupo]
-                media = sum(valores) / len(valores)
-                media_col = f'Media {(len(columnas_orden)-len(partidos_grupo))//5 + 1}'
-                metric_row[media_col] = f"{media:.2f}%"
+                if metric in ['Ocas Atz', 'Ocas Rival', 'Dif Ocas']:
+                    valores = [float(metric_row[col]) for col in partidos_grupo]
+                    media = sum(valores) / len(valores)
+                    media_col = f'Media {(len(columnas_orden)-len(partidos_grupo))//5 + 1}'
+                    metric_row[media_col] = f"{int(round(media))}"  # Sin % para ocasiones
+                else:
+                    valores = [float(metric_row[col].strip('%')) for col in partidos_grupo]
+                    media = sum(valores) / len(valores)
+                    media_col = f'Media {(len(columnas_orden)-len(partidos_grupo))//5 + 1}'
+                    metric_row[media_col] = f"{media:.2f}%"  # Con % para el resto
                 columnas_orden.append(media_col)
             
             # Media total
@@ -756,14 +794,23 @@ def update_table_data(n_intervals):
             for columna in metric_row.keys():
                 if columna not in ['Métrica', 'Media Total']:
                     try:
-                        porcentaje = float(metric_row[columna].strip('%'))
-                        valores_totales.append(porcentaje)
+                        if metric in ['Ocas Atz', 'Ocas Rival', 'Dif Ocas']:
+                            # Para métricas de ocasiones, tomar el valor directo sin strip
+                            valores_totales.append(float(metric_row[columna]))
+                        else:
+                            # Para el resto de métricas, quitar el %
+                            valores_totales.append(float(metric_row[columna].strip('%')))
                     except (ValueError, AttributeError):
                         continue
 
             if valores_totales:
                 media_total = sum(valores_totales) / len(valores_totales)
-                metric_row['Media Total'] = f"{media_total:.2f}%"
+                if metric in ['Ocas Atz', 'Ocas Rival', 'Dif Ocas']:
+                    # Para métricas de ocasiones, sin %
+                    metric_row['Media Total'] = f"{int(round(media_total))}"
+                else:
+                    # Para el resto de métricas, con %
+                    metric_row['Media Total'] = f"{media_total:.2f}%"
                 columnas_orden.append('Media Total')
             
             metrics_rows.append(metric_row)
