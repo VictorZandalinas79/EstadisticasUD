@@ -559,7 +559,23 @@ def generar_analisis_kpis(df):
 
 # Layout principal
 app.layout = html.Div([
-   dbc.Container([
+    # Imagen de fondo
+    html.Div(
+        style={
+            'position': 'fixed',
+            'width': '100%',
+            'height': '100%',
+            'top': 0,
+            'left': 0,
+            'zIndex': -1,
+            'backgroundImage': 'url("/assets/fondo_udatzeneta.png")',
+            'backgroundSize': 'cover',
+            'backgroundPosition': 'center',
+            'backgroundRepeat': 'no-repeat',
+            'opacity': '0.15'
+        }
+    ),
+    dbc.Container([
        # Componente de actualización automática
        dcc.Interval(
            id='interval-component',
@@ -604,7 +620,8 @@ html.Div([
             'width': '100%',
             'overflowX': 'auto',
             'maxWidth': '100vw',
-            'fontSize': '0.9rem'
+            'fontSize': '0.9rem',
+            'position': 'relative'  # Necesario para columna fija
         },
         style_header={
             'backgroundColor': 'rgb(230, 230, 230)',
@@ -630,6 +647,10 @@ html.Div([
                 'minWidth': '100px',
                 'width': '100px',
                 'maxWidth': '100px',
+                'position': 'sticky',
+                'left': 0,
+                'backgroundColor': 'white',
+                'zIndex': 1
             }
         ],
         markdown_options={'html': True}
