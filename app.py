@@ -24,6 +24,10 @@ app = dash.Dash(
     external_stylesheets=[dbc.themes.BOOTSTRAP]
 )
 
+# Añadir aquí el health check
+@server.route('/health')
+def health_check():
+    return 'OK'
 
 # Función para ejecutar consultas
 def execute_query(query, params=None):
