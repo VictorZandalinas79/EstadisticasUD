@@ -21,8 +21,13 @@ server = Flask(__name__)  # Primero crear el servidor Flask
 app = dash.Dash(
     __name__, 
     server=server,  # Usar el servidor Flask creado
-    external_stylesheets=[dbc.themes.BOOTSTRAP]
+    external_stylesheets=[dbc.themes.BOOTSTRAP],
+    title='UD Atzeneta Análisis',  # Título que aparecerá en la pestaña
+    update_title=None  # Evita que aparezca "Updating..." cuando se actualiza la página
 )
+
+# Configurar el favicon (el icono)
+app._favicon = 'escudo.png'  # Asegúrate de que escudo.png esté en la carpeta assets
 
 # Añadir aquí el health check
 @server.route('/health')
