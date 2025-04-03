@@ -1,0 +1,220 @@
+/* Estilos personalizados para UD Atzeneta Analytics - Tema Rojo y Negro */
+
+/* Variables de colores */
+:root {
+  --primary-color: #9d0000;       /* Rojo oscuro principal */
+  --secondary-color: #c70000;     /* Rojo medio secundario */
+  --accent-color: #ffcc00;        /* Amarillo acento */
+  --text-light: #ffffff;          /* Texto claro */
+  --text-dark: #222222;           /* Texto oscuro */
+  --bg-dark: #1a1a1a;             /* Fondo oscuro */
+  --bg-light: #f5f5f5;            /* Fondo claro */
+  --border-color: #444444;        /* Color de bordes */
+  --success-color: #28a745;       /* Verde para éxito */
+  --warning-color: #ffc107;       /* Amarillo para advertencias */
+  --danger-color: #dc3545;        /* Rojo para errores */
+}
+
+/* Estilos generales */
+body {
+  font-family: 'Roboto', 'Segoe UI', Arial, sans-serif;
+  background-color: var(--bg-light);
+  color: var(--text-dark);
+  margin: 0;
+  padding: 0;
+}
+
+/* Navbar personalizado */
+.navbar {
+  background-color: #000000 !important;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+}
+
+.navbar-brand {
+  font-weight: 700;
+  color: var(--text-light) !important;
+}
+
+.navbar-brand img {
+  margin-right: 8px;
+}
+
+.nav-link {
+  color: var(--text-light) !important;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.nav-link:hover {
+  color: var(--accent-color) !important;
+}
+
+/* Tarjetas */
+.card {
+  border-radius: 8px;
+  overflow: hidden;
+  margin-bottom: 20px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+  border: none;
+}
+
+.card-header {
+  background-color: var(--primary-color);
+  color: var(--text-light);
+  font-weight: 600;
+  padding: 15px 20px;
+}
+
+.card-body {
+  padding: 20px;
+}
+
+/* Tarjetas de navegación */
+.nav-card {
+  transition: transform 0.3s, box-shadow 0.3s;
+}
+
+.nav-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 8px 15px rgba(0, 0, 0, 0.3);
+}
+
+/* Formulario de login */
+.login-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  background-color: var(--bg-light);
+}
+
+.login-card {
+  max-width: 400px;
+  width: 100%;
+  padding: 30px;
+  background-color: white;
+  border-radius: 10px;
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+}
+
+.login-logo {
+  max-width: 150px;
+  margin: 0 auto 25px;
+  display: block;
+}
+
+/* Botones */
+.btn-primary {
+  background-color: var(--primary-color);
+  border-color: var(--primary-color);
+  transition: all 0.2s ease;
+}
+
+.btn-primary:hover {
+  background-color: var(--secondary-color);
+  border-color: var(--secondary-color);
+}
+
+.btn-outline-primary {
+  color: var(--primary-color);
+  border-color: var(--primary-color);
+}
+
+.btn-outline-primary:hover {
+  background-color: var(--primary-color);
+  color: white;
+}
+
+/* Tablas */
+.dash-table-container .dash-spreadsheet-container .dash-spreadsheet-inner th {
+  background-color: #000000 !important;
+  color: white !important;
+  font-weight: bold !important;
+  text-align: center !important;
+}
+
+.dash-table-container .dash-spreadsheet-container .dash-spreadsheet-inner td {
+  text-align: center !important;
+}
+
+/* Personalizaciones para tabla de KPIs */
+.metric-high {
+  background-color: rgba(157, 0, 0, 0.7) !important;
+  color: white !important;
+}
+
+.metric-medium {
+  background-color: rgba(255, 193, 7, 0.7) !important;
+}
+
+.metric-low {
+  background-color: rgba(0, 0, 0, 0.7) !important;
+  color: white !important;
+}
+
+/* Indicadores de dashboard */
+.indicator-card {
+  text-align: center;
+  padding: 20px;
+}
+
+.indicator-value {
+  font-size: 2.5rem;
+  font-weight: 700;
+  margin-bottom: 5px;
+}
+
+.indicator-label {
+  font-size: 0.9rem;
+  color: #666;
+}
+
+/* Footer */
+.footer {
+  background-color: #000000;
+  color: white;
+  padding: 15px 0;
+  text-align: center;
+  margin-top: 40px;
+}
+
+/* Elementos específicos para tarjetas de iconos */
+.icon-card {
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  border: 1px solid #ddd;
+  background: linear-gradient(145deg, #ffffff, #f5f5f5);
+}
+
+.icon-card:hover {
+  transform: translateY(-8px);
+  box-shadow: 0 10px 20px rgba(157, 0, 0, 0.2);
+  border-color: var(--primary-color);
+}
+
+.icon-card img {
+  transition: transform 0.3s ease;
+}
+
+.icon-card:hover img {
+  transform: scale(1.1);
+}
+
+.icon-card h4 {
+  color: var(--primary-color);
+  font-weight: 600;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .card-header {
+    padding: 12px 15px;
+  }
+  
+  .card-body {
+    padding: 15px;
+  }
+  
+  .indicator-value {
+    font-size: 2rem;
+  }
+}
