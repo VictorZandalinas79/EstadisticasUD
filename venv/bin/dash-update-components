@@ -1,4 +1,4 @@
-#!/Users/imac/Programas/UDAtzeneta_datos/venv/bin/python3.12
+#!/Users/imac/Programas/Tareas_master_Python_avanzado/M9/tarea/venv/bin/python3.12
 # -*- coding: utf-8 -*-
 import re
 import sys

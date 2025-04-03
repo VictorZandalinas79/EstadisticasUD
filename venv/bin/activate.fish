@@ -33,7 +33,7 @@ end
 # Unset irrelevant variables.
 deactivate nondestructive
 
-set -gx VIRTUAL_ENV "/Users/imac/Programas/UDAtzeneta_datos/venv"
+set -gx VIRTUAL_ENV "/Users/imac/Programas/Tareas_master_Python_avanzado/M9/tarea/venv"
 
 set -gx _OLD_VIRTUAL_PATH $PATH
 set -gx PATH "$VIRTUAL_ENV/bin" $PATH
