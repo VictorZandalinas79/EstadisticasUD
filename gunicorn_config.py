@@ -1,27 +1,33 @@
-# Configuración básica para Gunicorn
+# Configuración básica para Gunicorn - Optimizada para entornos con recursos limitados
 
 # Puerto en el que Gunicorn escuchará
 bind = "0.0.0.0:10000"
 
-# Número de workers (procesos) que Gunicorn lanzará
-# Para planes gratuitos de Render con recursos limitados, menos workers pueden ser más eficientes
+# Solo un worker - más simple para entornos con memoria limitada
 workers = 1
 
-# Timeout en segundos
-timeout = 120
+# Aumentar el timeout para dar más tiempo a la carga inicial
+timeout = 300
 
-# Clase de worker a utilizar - usado el worker sync que es más básico pero confiable
+# Worker sincrónico básico
 worker_class = "sync"
 
-# Nivel de log
-loglevel = "info"
+# Reducir threads para minimizar consumo de memoria
+threads = 1
 
-# Threads por worker
-threads = 2
+# Desactivar precarga para reducir consumo de memoria inicial
+preload_app = False
 
-# Tiempo de precarga
-preload_app = True
+# Nivel de log para mejor diagnóstico
+loglevel = "debug"
 
-# Opciones de worker
-max_requests = 1000
-max_requests_jitter = 50
+# Deshabilitar max_requests para evitar reinicios
+max_requests = 0
+max_requests_jitter = 0
+
+# Configuraciones de rendimiento para entornos limitados
+worker_tmp_dir = "/dev/shm"
+keepalive = 2
+
+# Aumentar buffer para mejorar el manejo de conexiones
+forwarded_allow_ips = '*'
