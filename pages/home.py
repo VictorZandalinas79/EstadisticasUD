@@ -63,7 +63,7 @@ def home_layout():
                                 html.A(
                                     dbc.Card([
                                         dbc.CardBody([
-                                            html.Img(src="/assets/momentos_juego.jpeg", height="120px", className="mx-auto d-block mb-3"),
+                                            html.Img(src="/assets/momentos_juego.jpg", height="120px", className="mx-auto d-block mb-3"),
                                             html.H4("Momentos de Juego", className="text-center m-0 fw-bold"),
                                         ], className="d-flex flex-column align-items-center justify-content-center h-100")
                                     ], className="h-100 shadow text-center", color="light", style={"cursor": "pointer", "transition": "transform 0.2s", ":hover": {"transform": "scale(1.05)"}})
