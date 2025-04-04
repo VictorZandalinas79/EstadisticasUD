@@ -11,7 +11,8 @@ workers = 2
 timeout = 120
 
 # Clase de worker a utilizar
-worker_class = "gevent"
+# En caso de problemas con gevent, puedes usar un worker alternativo como 'sync'
+worker_class = "sync"
 
 # Nivel de log
 loglevel = "info"
