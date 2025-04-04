@@ -1,41 +1,20 @@
-import dash
-import dash_bootstrap_components as dbc
-from dash import dcc, html
-from dash.dependencies import Input, Output
+# Configuración básica para Gunicorn
 
-# Inicializar la aplicación Dash
-app = dash.Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP])
+# Puerto en el que Gunicorn escuchará
+bind = "0.0.0.0:10000"
 
-# Importante: Exporta el servidor para que Gunicorn pueda usarlo
-server = app.server
+# Número de workers (procesos) que Gunicorn lanzará
+# Para planes gratuitos de Render con recursos limitados, menos workers pueden ser más eficientes
+workers = 2
 
-# Diseño de la aplicación
-app.layout = dbc.Container([
-    dbc.Row([
-        dbc.Col([
-            html.H1("Mi Aplicación Dash"),
-            html.Hr(),
-            dcc.Dropdown(
-                id='dropdown-example',
-                options=[
-                    {'label': 'Opción 1', 'value': 'opt1'},
-                    {'label': 'Opción 2', 'value': 'opt2'},
-                ],
-                value='opt1'
-            ),
-            html.Div(id='output-container')
-        ])
-    ])
-])
+# Timeout en segundos
+timeout = 120
 
-# Callbacks
-@app.callback(
-    Output('output-container', 'children'),
-    [Input('dropdown-example', 'value')]
-)
-def update_output(value):
-    return f'Has seleccionado: {value}'
+# Clase de worker a utilizar
+worker_class = "gevent"
 
-# Esta condición permite ejecutar la app directamente con "python app.py"
-if __name__ == '__main__':
-    app.run_server(debug=True)
+# Nivel de log
+loglevel = "info"
+
+# Permite a Gunicorn recargar automáticamente cuando detecta cambios en el código
+reload = True
