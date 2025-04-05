@@ -111,7 +111,7 @@ def get_filtered_corners_data(players=None, descriptions=None):
         
         # Construir la consulta SQL base - AÑADIR xStart, yStart, xEnd, yEnd a la consulta
         query = """
-        SELECT ID as id, idcode, player, team, idgroup, idtext, descripcion, mins as minute,
+        SELECT ID as id, idcode, player, team, idgroup, idtext, secundary, descripcion, mins as minute,
                xStart, yStart, xEnd, yEnd
         FROM bot_events 
         WHERE idcode = 'Corner'
@@ -247,6 +247,16 @@ def create_corner_visualization(df_corners, selected_players, selected_descripti
         corner_info['player'] = first_record['player']
         corner_info['descripcion'] = first_record['descripcion']
         corner_info['minute'] = first_record['minute']
+        corner_info['secundary'] = first_record.get('secundary', None)  # Rematador
+        
+        # Extraer coordenadas si están disponibles
+        if 'xStart' in first_record and 'yStart' in first_record:
+            corner_info['xStart'] = first_record['xStart']
+            corner_info['yStart'] = first_record['yStart']
+        
+        if 'xEnd' in first_record and 'yEnd' in first_record:
+            corner_info['xEnd'] = first_record['xEnd']
+            corner_info['yEnd'] = first_record['yEnd']
         
         # Extraer atributos específicos
         for _, record in corner_records.iterrows():
@@ -259,7 +269,24 @@ def create_corner_visualization(df_corners, selected_players, selected_descripti
             elif record['idgroup'] == 'Caida lanzamiento':
                 corner_info['landing'] = record['idtext']
             elif record['idgroup'] == 'Ocasión':
-                corner_info['chance'] = record['idtext']
+                # Mapear valores de idtext a categorías de chance
+                occasion_text = record['idtext']
+                if occasion_text == 'Ocasión clarisima':
+                    corner_info['chance'] = 'Alta'
+                elif occasion_text == 'Ocasión Clara':
+                    corner_info['chance'] = 'Media'
+                elif occasion_text == 'Remate sin importancia':
+                    corner_info['chance'] = 'Leve'
+                elif occasion_text == 'Sin ocasión':
+                    corner_info['chance'] = 'Sin ocasión'
+                else:
+                    corner_info['chance'] = occasion_text
+            elif record['idgroup'] == 'Zona remate':
+                corner_info['zona_remate'] = record['idtext']
+                # Guardar coordenadas de remate si existen
+                if 'xPort' in record and 'yPort' in record:
+                    corner_info['xRemate'] = record['xPort']
+                    corner_info['yRemate'] = record['yPort']
         
         corner_data.append(corner_info)
     
@@ -268,31 +295,7 @@ def create_corner_visualization(df_corners, selected_players, selected_descripti
     
     # Crear visualizaciones
     
-    # 1. Gráfico de distribución de córners por jugador
-    if selected_players and len(selected_players) > 1:
-        player_dist_fig = px.bar(
-            df_corner_analysis['player'].value_counts().reset_index(),
-            x='player',
-            y='count',
-            labels={'player': 'Jugador', 'count': 'Número de córners'},
-            title='Distribución de córners por jugador'
-        )
-    else:
-        player_dist_fig = None
-    
-    # 2. Gráfico de distribución por descripción
-    if selected_descriptions and len(selected_descriptions) > 1:
-        desc_dist_fig = px.bar(
-            df_corner_analysis['descripcion'].value_counts().reset_index(),
-            x='descripcion',
-            y='count',
-            labels={'descripcion': 'Descripción', 'count': 'Número de córners'},
-            title='Distribución de córners por descripción'
-        )
-    else:
-        desc_dist_fig = None
-    
-    # 3. Gráfico de efectividad (ocasiones generadas)
+    # 1. Gráfico de efectividad (ocasiones generadas)
     if 'chance' in df_corner_analysis.columns:
         chance_counts = df_corner_analysis['chance'].value_counts().reset_index()
         chance_fig = px.pie(
@@ -307,29 +310,124 @@ def create_corner_visualization(df_corners, selected_players, selected_descripti
     else:
         chance_fig = None
     
+    # 2. Gráfica de barras de rematadores
+    rematadores_fig = None
+    if 'secundary' in df_corner_analysis.columns:
+        # Eliminar valores nulos en secundary
+        df_rematadores = df_corner_analysis.dropna(subset=['secundary'])
+        
+        if not df_rematadores.empty:
+            # Contar ocurrencias de cada rematador
+            rematadores_counts = df_rematadores['secundary'].value_counts().reset_index()
+            rematadores_counts.columns = ['Rematador', 'Cantidad']
+            
+            # Ordenar por cantidad descendente y tomar los 10 principales
+            rematadores_counts = rematadores_counts.sort_values('Cantidad', ascending=False).head(10)
+            
+            # Crear gráfica de barras
+            rematadores_fig = px.bar(
+                rematadores_counts,
+                x='Rematador',
+                y='Cantidad',
+                title='Principales Rematadores',
+                color='Cantidad',
+                color_continuous_scale=px.colors.sequential.Viridis
+            )
+            
+            # Mejorar la apariencia
+            rematadores_fig.update_layout(
+                xaxis_title="Rematador",
+                yaxis_title="Número de remates",
+                plot_bgcolor='rgba(0,0,0,0.02)',
+                xaxis={'categoryorder':'total descending'}
+            )
+    
+    # 3. Análisis por zona de remate
+    zona_remate_fig = None
+    if 'zona_remate' in df_corner_analysis.columns:
+        zonas_remate = df_corner_analysis.dropna(subset=['zona_remate'])
+        
+        if not zonas_remate.empty:
+            # Contar ocurrencias por zona de remate y nivel de peligrosidad
+            if 'chance' in zonas_remate.columns:
+                zona_chance_counts = zonas_remate.groupby(['zona_remate', 'chance']).size().reset_index(name='count')
+                
+                # Crear gráfica de barras agrupadas
+                zona_remate_fig = px.bar(
+                    zona_chance_counts,
+                    x='zona_remate',
+                    y='count',
+                    color='chance',
+                    title='Zonas de Remate por Nivel de Peligrosidad',
+                    barmode='group',
+                    color_discrete_map={
+                        'Alta': 'red',
+                        'Media': 'orange',
+                        'Leve': 'yellow',
+                        'Sin ocasión': 'gray'
+                    }
+                )
+                
+                # Mejorar la apariencia
+                zona_remate_fig.update_layout(
+                    xaxis_title="Zona de Remate",
+                    yaxis_title="Número de Remates",
+                    legend_title="Peligrosidad",
+                    plot_bgcolor='rgba(0,0,0,0.02)'
+                )
+    
     # Crear componente con las visualizaciones
     viz_components = []
     
     # Añadir título
     viz_components.append(html.H4(title, className="mb-4"))
     
-    # Añadir gráficos de distribución si hay múltiples selecciones
-    if player_dist_fig or desc_dist_fig:
-        row_children = []
-        
-        if player_dist_fig:
-            row_children.append(dbc.Col(dcc.Graph(figure=player_dist_fig), md=6))
-        
-        if desc_dist_fig:
-            row_children.append(dbc.Col(dcc.Graph(figure=desc_dist_fig), md=6))
-        
-        viz_components.append(dbc.Row(row_children, className="mb-4"))
+    # Añadir gráfico de pizza y campograma lado a lado
+    row_children = []
     
-    # Añadir gráfico de efectividad
+    # Columna para el gráfico de pizza
     if chance_fig:
+        row_children.append(dbc.Col(
+            dcc.Graph(figure=chance_fig, style={"height": "500px"}),  # Aumenta la altura
+            md=5, className="px-1"  # Reduce el padding horizontal
+        ))
+    
+    # Columna para el campograma
+    row_children.append(dbc.Col(
+        create_corner_pitch_visualization(df_corner_analysis),
+        md=7, className="px-1"  # Reduce el padding horizontal
+    ))
+    
+    viz_components.append(dbc.Row(row_children, className="mb-2"))
+    
+    # Nueva fila para gráficas adicionales
+    row2_children = []
+    
+    # Gráfica de barras de rematadores
+    if rematadores_fig:
+        row2_children.append(dbc.Col(
+            dcc.Graph(figure=rematadores_fig, style={"height": "400px"}),
+            md=5, className="px-1"
+        ))
+    
+    # Campograma con zonas de remate
+    row2_children.append(dbc.Col(
+        create_remate_pitch_visualization(df_corner_analysis),
+        md=7, className="px-1"
+    ))
+    
+    if row2_children:
+        viz_components.append(html.H4("Análisis de Rematadores", className="mt-4 mb-3"))
+        viz_components.append(dbc.Row(row2_children, className="mb-2"))
+    
+    # Tercera fila para zonas de remate (si es necesario)
+    if zona_remate_fig:
         viz_components.append(dbc.Row([
-            dbc.Col(dcc.Graph(figure=chance_fig))
-        ], className="mb-4"))
+            dbc.Col(
+                dcc.Graph(figure=zona_remate_fig, style={"height": "400px"}),
+                width=12, className="px-1"
+            )
+        ], className="mb-3"))
     
     # Añadir tabla resumen si hay pocos datos
     if len(df_corner_analysis) <= 20:
@@ -514,6 +612,236 @@ def create_stats_table(df):
         responsive=True
     )
 
+# Función campograma para rematadores
+def create_remate_pitch_visualization(df_corners):
+    """
+    Crea una visualización del campograma con las zonas de remate resaltadas
+    
+    Args:
+        df_corners (DataFrame): Datos de córners con zonas de remate
+    
+    Returns:
+        dcc.Graph: Gráfico interactivo con las zonas de remate
+    """
+    
+    if df_corners.empty:
+        return html.Div("No hay datos disponibles para visualizar en el campograma", 
+                       className="text-center text-muted my-3")
+    
+    # Verificar si hay coordenadas de remate (usamos xEnd y yEnd en lugar de xRemate y yRemate)
+    has_remate_coords = ('xEnd' in df_corners.columns and 'yEnd' in df_corners.columns)
+    
+    if not has_remate_coords:
+        return html.Div("No se encontraron coordenadas de remate (xEnd/yEnd) para visualizar", 
+                       className="text-center text-muted my-3")
+    
+    # Función para normalizar coordenadas (se mantiene igual)
+    def normalize_coordinates(x, y):
+        try:
+            x = float(x)
+            y = float(y)
+        except (ValueError, TypeError):
+            return None, None
+        
+        x_orig_min, x_orig_max = 4.0, 316.0
+        y_orig_min, y_orig_max = 8.0, 478.0
+        
+        x_norm = ((x - x_orig_min) / (x_orig_max - x_orig_min)) * 100.0
+        y_norm = 100.0 - ((y - y_orig_min) / (y_orig_max - y_orig_min)) * 100.0
+        
+        x_rotated = y_norm
+        y_rotated = x_norm
+        
+        return x_rotated, y_rotated
+    
+    # Convertir las columnas numéricas (ahora usamos xEnd y yEnd)
+    numeric_columns = ['xEnd', 'yEnd']
+    for col in numeric_columns:
+        if col in df_corners.columns:
+            df_corners[col] = df_corners[col].astype(float)
+    
+    # Filtrar registros con coordenadas de remate válidas (usando xEnd y yEnd)
+    df_remates = df_corners.dropna(subset=['xEnd', 'yEnd'])
+    
+    # Normalizar coordenadas para todos los remates
+    normalized_remates = []
+    
+    for _, remate in df_remates.iterrows():
+        if pd.notna(remate['xEnd']) and pd.notna(remate['yEnd']):
+            x_remate, y_remate = normalize_coordinates(remate['xEnd'], remate['yEnd'])
+            
+            if x_remate is None or y_remate is None:
+                continue
+            
+            # Determinar color basado en la peligrosidad
+            if 'chance' in remate:
+                if remate['chance'] == 'Alta':
+                    color = 'red'
+                elif remate['chance'] == 'Media':
+                    color = 'orange'
+                elif remate['chance'] == 'Leve':
+                    color = 'yellow'
+                elif remate['chance'] == 'Sin ocasión':
+                    color = 'white'
+                else:
+                    color = 'blue'
+            else:
+                color = 'blue'
+            
+            # Crear objeto con información del remate
+            remate_info = {
+                'id': remate.get('id', None),
+                'x_remate': y_remate,
+                'y_remate': x_remate,
+                'secundary': remate.get('secundary', 'Desconocido'),
+                'color': color,
+                'chance': remate.get('chance', 'Desconocida'),
+                'zona_remate': remate.get('zona_remate', 'Desconocida')
+            }
+            
+            normalized_remates.append(remate_info)
+    
+    if not normalized_remates:
+        return html.Div("No se encontraron coordenadas válidas de remate", 
+                       className="text-center text-muted my-3")
+    
+    try:
+        # PASO 1: Crear la imagen del campo
+        pitch = VerticalPitch(pitch_type='wyscout', 
+                              half=True,
+                              goal_type='box',
+                              pitch_color='grass', 
+                              line_color='white')
+        
+        fig, ax = plt.subplots(figsize=(9, 12))
+        pitch.draw(ax=ax)
+        
+        # Dibujar zonas de remate como círculos sombreados
+        for remate in normalized_remates:
+            # Círculo sombreado para la zona de remate
+            circle = plt.Circle(
+                (remate['x_remate'], remate['y_remate']), 
+                radius=3,  # Ajustar radio según necesidad
+                color=remate['color'], 
+                alpha=0.5,  # Semi-transparente
+                zorder=2
+            )
+            ax.add_patch(circle)
+        
+        # Añadir título
+        plt.title('Zonas de Remate', fontsize=15)
+        
+        # Añadir leyenda
+        from matplotlib.lines import Line2D
+        from matplotlib.patches import Patch
+        
+        legend_elements = [
+            Patch(facecolor='red', alpha=0.5, label='Ocasión clarísima'),
+            Patch(facecolor='orange', alpha=0.5, label='Ocasión clara'),
+            Patch(facecolor='yellow', alpha=0.5, label='Remate sin importancia'),
+            Patch(facecolor='white', alpha=0.5, label='Sin ocasión')
+        ]
+        ax.legend(handles=legend_elements, loc='upper center', bbox_to_anchor=(0.5, -0.05),
+                  frameon=False, ncol=4)
+        
+        # Ajustar los márgenes
+        plt.tight_layout()
+        
+        # Convertir la figura a una imagen
+        buf = io.BytesIO()
+        plt.savefig(buf, format='png', dpi=100, bbox_inches='tight')
+        plt.close(fig)
+        buf.seek(0)
+        
+        # Obtener dimensiones de la imagen para establecer la relación de aspecto correcta
+        from PIL import Image
+        with Image.open(buf) as img:
+            width, height = img.size
+        buf.seek(0)
+        
+        # Codificar la imagen en base64
+        img_data = base64.b64encode(buf.read()).decode('utf-8')
+        
+        # PASO 2: Crear una nueva figura de Plotly que contendrá la imagen y las trazas interactivas
+        plotly_fig = go.Figure()
+        
+        # Añadir la imagen como fondo
+        plotly_fig.add_layout_image(
+            dict(
+                source=f'data:image/png;base64,{img_data}',
+                xref="paper",
+                yref="paper",
+                x=0,
+                y=1,
+                sizex=1,
+                sizey=1,
+                sizing="stretch",
+                opacity=1,
+                layer="below"
+            )
+        )
+        
+        # PASO 3: Función para invertir coordenadas X (donde 0 es 100 y 100 es 0)
+        def invert_x(x):
+            return 100 - x
+        
+        # PASO 4: Añadir trazas interactivas invisibles sobre la imagen
+        for i, remate in enumerate(normalized_remates):
+            hover_text = f"<b>Rematador:</b> {remate['secundary']}<br>" + \
+                         f"<b>Peligrosidad:</b> {remate['chance']}"
+            
+            if 'zona_remate' in remate:
+                hover_text += f"<br><b>Zona:</b> {remate['zona_remate']}"
+            
+            # Punto para la zona de remate (invisible pero detecta hover)
+            plotly_fig.add_trace(go.Scatter(
+                x=[invert_x(remate['x_remate'])],
+                y=[remate['y_remate']],
+                mode='markers',
+                marker=dict(size=20, color=remate['color']),
+                opacity=0,
+                hoverinfo='text',
+                hovertext=hover_text,
+                showlegend=False
+            ))
+        
+        # PASO 5: Configurar el layout para que se ajuste a la imagen
+        aspect_ratio = height / width
+        
+        plotly_fig.update_layout(
+            autosize=True,
+            height=500,
+            margin=dict(l=0, r=0, t=0, b=0),
+            paper_bgcolor='rgba(0,0,0,0)',
+            plot_bgcolor='rgba(0,0,0,0)',
+            xaxis=dict(
+                visible=False,
+                range=[0, 100],
+                fixedrange=True
+            ),
+            yaxis=dict(
+                visible=False,
+                range=[0, 100],
+                scaleanchor="x",
+                scaleratio=aspect_ratio,
+                fixedrange=True
+            ),
+            showlegend=False,
+            hovermode='closest'
+        )
+        
+        # Devolver el gráfico interactivo
+        return dcc.Graph(
+            figure=plotly_fig,
+            config={'displayModeBar': False},  # Ocultar la barra de herramientas de Plotly
+            style={'width': '100%', 'height': '100%'}
+        )
+        
+    except Exception as e:
+        print(f"Error al crear el campograma de remates: {str(e)}")
+        return html.Div(f"Error al crear el campograma de remates: {str(e)}", 
+                       className="text-center text-danger my-3")
+
 # Registrar callbacks para la interactividad
 def register_corners_callbacks(app):
     # Callback para cargar las opciones de filtro
@@ -582,13 +910,14 @@ def register_corners_callbacks(app):
         
 def create_corner_pitch_visualization(df_corners):
     """
-    Crea una visualización de los lanzamientos de córners en un campograma usando mplsoccer
+    Crea una visualización interactiva de los lanzamientos de córners en un campograma
+    con flechas curvas según el tipo de golpeo
     
     Args:
         df_corners (DataFrame): Datos de córners con coordenadas
     
     Returns:
-        html.Img: Imagen del campograma de córners
+        dcc.Graph: Gráfico interactivo con el campograma de córners
     """
     
     if df_corners.empty:
@@ -616,23 +945,31 @@ def create_corner_pitch_visualization(df_corners):
         x_orig_min, x_orig_max = 4.0, 316.0
         y_orig_min, y_orig_max = 8.0, 478.0
         
-        # Coordenadas destino (Wyscout)
-        x_wyscout_min, x_wyscout_max = 0.0, 100.0
-        y_wyscout_min, y_wyscout_max = 0.0, 100.0  # Invertimos porque en Wyscout el eje Y crece hacia arriba
+        # Normalizar al rango 0-100
+        x_norm = ((x - x_orig_min) / (x_orig_max - x_orig_min)) * 100.0
         
-        # Normalizar X
-        x_norm = ((x - x_orig_min) / (x_orig_max - x_orig_min)) * (x_wyscout_max - x_wyscout_min) + x_wyscout_min
+        # Invertir el eje Y ya que en el sistema original Y aumenta hacia abajo
+        y_norm = 100.0 - ((y - y_orig_min) / (y_orig_max - y_orig_min)) * 100.0
         
-        # Normalizar Y e invertir (en el sistema Wyscout, y=0 es abajo y y=100 es arriba)
-        y_norm = 100.0 - ((y - y_orig_min) / (y_orig_max - y_orig_min)) * (y_wyscout_max - y_wyscout_min) + y_wyscout_min
+        # Para rotar 90 grados a la izquierda: (x,y) -> (y,100-x)
+        # Esta transformación gira el campo para que la portería de ataque quede arriba
+        x_rotated = y_norm
+        y_rotated = x_norm
         
-        return x_norm, y_norm
+        return x_rotated, y_rotated
     
     # Convertir las columnas numéricas de Decimal a float
     numeric_columns = ['xStart', 'yStart', 'xEnd', 'yEnd']
     for col in numeric_columns:
         if col in df_corners.columns:
             df_corners[col] = df_corners[col].astype(float)
+    
+    # Determinar qué córners tienen golpeo Abierto o Cerrado
+    kick_types = {}
+    for _, row in df_corners.iterrows():
+        if 'id' in row and 'idgroup' in row and 'idtext' in row:
+            if row['idgroup'] == 'Golpeo':
+                kick_types[row['id']] = row['idtext']
     
     # Normalizar coordenadas para todos los córners
     normalized_corners = []
@@ -655,40 +992,135 @@ def create_corner_pitch_visualization(df_corners):
                 elif corner['chance'] == 'Leve':
                     color = 'yellow'
                 elif corner['chance'] == 'Sin ocasión':
-                    color = 'gray'
+                    color = 'white'
                 else:
                     color = 'blue'
             else:
                 color = 'blue'
             
-            normalized_corners.append({
+            # Determinar tipo de curva para la flecha según el tipo de golpeo
+            is_curved = False
+            curve_type = None
+            corner_id = corner.get('id')
+            
+            if corner_id in kick_types:
+                if kick_types[corner_id] == 'Cerrado':
+                    is_curved = True
+                    curve_type = 'Cerrado'  # cóncavo
+                elif kick_types[corner_id] == 'Abierto':
+                    is_curved = True
+                    curve_type = 'Abierto'  # convexo
+            
+            # Si no tenemos la información de idgroup/idtext, intentar obtenerla de kick_type
+            if not is_curved and 'kick_type' in corner:
+                if corner['kick_type'] == 'Cerrado':
+                    is_curved = True
+                    curve_type = 'Cerrado'
+                elif corner['kick_type'] == 'Abierto':
+                    is_curved = True
+                    curve_type = 'Abierto'
+            
+            # Crear objeto con información completa del córner
+            corner_info = {
+                'id': corner.get('id', None),
                 'x_start': x_start,
                 'y_start': y_start,
                 'x_end': x_end,
                 'y_end': y_end,
                 'player': corner.get('player', 'Desconocido'),
-                'color': color
-            })
+                'color': color,
+                'chance': corner.get('chance', 'Desconocida'),
+                'descripcion': corner.get('descripcion', 'Sin descripción'),
+                'minute': corner.get('minute', 'Desconocido'),
+                'is_curved': is_curved,
+                'curve_type': curve_type
+            }
+            
+            # Añadir campos adicionales si existen
+            for field in ['side', 'kick_type', 'defense_type', 'landing']:
+                if field in corner:
+                    corner_info[field] = corner[field]
+                    
+            normalized_corners.append(corner_info)
     
     if not normalized_corners:
         return html.Div("No se encontraron coordenadas válidas para los lanzamientos de córner", 
                        className="text-center text-muted my-3")
     
     try:
-        # Crear la figura con mplsoccer
-        pitch = VerticalPitch(pitch_type='wyscout', half=False, goal_type='box')
+        # PASO 1: Crear la imagen del campo exactamente como en el código original
+        pitch = VerticalPitch(pitch_type='wyscout', 
+                              half=True,
+                              goal_type='box',
+                              pitch_color='grass', 
+                              line_color='white')
         
-        fig, ax = plt.subplots(figsize=(10, 7))
+        fig, ax = plt.subplots(figsize=(9, 12))  # Usar el mismo tamaño que en el original
         pitch.draw(ax=ax)
         
-        # Dibujar cada córner
+        # Dibujar los córners para obtener la imagen base
         for corner in normalized_corners:
-            # Dibujar la trayectoria del córner
-            pitch.lines(corner['x_start'], corner['y_start'],
-                        corner['x_end'], corner['y_end'], 
-                        comet=True, color=corner['color'], ax=ax, alpha=0.7)
+            if corner['is_curved']:
+                # Calcular el punto medio entre inicio y fin
+                mid_x = (corner['x_start'] + corner['x_end']) / 2
+                mid_y = (corner['y_start'] + corner['y_end']) / 2
+                
+                # Calcular vector dirección (de inicio a fin)
+                vx = corner['x_end'] - corner['x_start']
+                vy = corner['y_end'] - corner['y_start']
+                length = np.sqrt(vx**2 + vy**2)
+                
+                if length > 0:
+                    # Vector perpendicular unitario - IMPORTANTE: invertir x por y
+                    # Ya que ahora x es realmente el eje vertical y y el horizontal
+                    nx = vx / length  # Usamos el vector directo (no perpendicular)
+                    ny = -vy / length  # Negamos para obtener perpendicular correcto
+                    
+                    # Ajustar la dirección según el tipo de curva
+                    curve_strength = length * 0.3  # Ajusta la curvatura
+                    
+                    # Invertimos la lógica para Cerrado/Abierto
+                    if corner['curve_type'] == 'Abierto':  # Convexo
+                        nx = -nx
+                        ny = -ny
+                    
+                    # Calcular el punto de control
+                    control_x = mid_x + nx * curve_strength
+                    control_y = mid_y + ny * curve_strength
+                    
+                    # Crear la curva con múltiples puntos
+                    t_values = np.linspace(0, 1, 50)
+                    curve_x = []
+                    curve_y = []
+                    
+                    for t in t_values:
+                        # Fórmula para una curva cuadrática de Bézier
+                        x = (1-t)**2 * corner['y_start'] + 2*(1-t)*t * control_y + t**2 * corner['y_end']
+                        y = (1-t)**2 * corner['x_start'] + 2*(1-t)*t * control_x + t**2 * corner['x_end']
+                        curve_x.append(x)
+                        curve_y.append(y)
+                    
+                    # Dibujar la curva
+                    ax.plot(curve_x, curve_y, color=corner['color'], alpha=0.7, linewidth=2)
+                    
+                    # Dibujar la flecha en el extremo
+                    arrow_idx = len(curve_x) - 2  # Penúltimo punto
+                    dx = curve_x[-1] - curve_x[arrow_idx]
+                    dy = curve_y[-1] - curve_y[arrow_idx]
+                    ax.arrow(curve_x[arrow_idx], curve_y[arrow_idx], dx, dy, 
+                            head_width=2, head_length=2, fc=corner['color'], ec=corner['color'], alpha=0.7)
+                else:
+                    # Si la longitud es cero (puntos coincidentes), usar línea recta
+                    pitch.lines(corner['x_start'], corner['y_start'],
+                                corner['x_end'], corner['y_end'], 
+                                comet=True, color=corner['color'], ax=ax, alpha=0.7)
+            else:
+                # Para líneas rectas, usar el método original
+                pitch.lines(corner['x_start'], corner['y_start'],
+                            corner['x_end'], corner['y_end'], 
+                            comet=True, color=corner['color'], ax=ax, alpha=0.7)
             
-            # Punto de origen del córner
+            # Punto de origen del córner (siempre igual)
             pitch.scatter(corner['x_start'], corner['y_start'], s=100, 
                          color=corner['color'], alpha=0.8, ax=ax)
         
@@ -709,146 +1141,188 @@ def create_corner_pitch_visualization(df_corners):
         # Ajustar los márgenes
         plt.tight_layout()
         
-        # Convertir la figura a una imagen para Dash
+        # Convertir la figura a una imagen
         buf = io.BytesIO()
         plt.savefig(buf, format='png', dpi=100, bbox_inches='tight')
         plt.close(fig)
         buf.seek(0)
         
+        # Obtener dimensiones de la imagen para establecer la relación de aspecto correcta
+        from PIL import Image
+        with Image.open(buf) as img:
+            width, height = img.size
+        buf.seek(0)
+        
         # Codificar la imagen en base64
         img_data = base64.b64encode(buf.read()).decode('utf-8')
         
-        # Devolver la imagen como un componente HTML
-        return html.Img(src=f'data:image/png;base64,{img_data}',
-                       style={'width': '100%', 'height': 'auto'})
-    
+        # PASO 2: Crear una nueva figura de Plotly que contendrá la imagen y las trazas interactivas
+        plotly_fig = go.Figure()
+        
+        # Añadir la imagen como fondo
+        plotly_fig.add_layout_image(
+            dict(
+                source=f'data:image/png;base64,{img_data}',
+                xref="paper",
+                yref="paper",
+                x=0,
+                y=1,
+                sizex=1,
+                sizey=1,
+                sizing="stretch",
+                opacity=1,
+                layer="below"
+            )
+        )
+        
+        # PASO 3: Función para invertir coordenadas X (donde 0 es 100 y 100 es 0)
+        def invert_x(x):
+            return 100 - x
+        
+        # PASO 4: Añadir trazas interactivas invisibles sobre la imagen
+        # Usamos opacity=0 para hacerlas invisibles pero detectables al pasar el cursor
+        for i, corner in enumerate(normalized_corners):
+            hover_text = f"<b>Jugador:</b> {corner['player']}<br>" + \
+                         f"<b>Partido:</b> {corner['descripcion']}<br>" + \
+                         f"<b>Minuto:</b> {corner['minute']}<br>" + \
+                         f"<b>Peligrosidad:</b> {corner['chance']}"
+            
+            # Añadir información adicional si está disponible
+            if 'kick_type' in corner:
+                hover_text += f"<br><b>Tipo de golpeo:</b> {corner['kick_type']}"
+            elif 'curve_type' in corner and corner['curve_type']:
+                hover_text += f"<br><b>Tipo de golpeo:</b> {corner['curve_type']}"
+            if 'side' in corner:
+                hover_text += f"<br><b>Lado:</b> {corner['side']}"
+            if 'defense_type' in corner:
+                hover_text += f"<br><b>Tipo defensa:</b> {corner['defense_type']}"
+            if 'landing' in corner:
+                hover_text += f"<br><b>Caída:</b> {corner['landing']}"
+            
+            if corner['is_curved']:
+                # Crear puntos para la curva en Plotly
+                mid_x = (corner['x_start'] + corner['x_end']) / 2
+                mid_y = (corner['y_start'] + corner['y_end']) / 2
+                
+                # Calcular vector dirección
+                vx = corner['x_end'] - corner['x_start']
+                vy = corner['y_end'] - corner['y_start']
+                length = np.sqrt(vx**2 + vy**2)
+                
+                if length > 0:
+                    # Vector perpendicular unitario - usando la misma lógica que arriba
+                    nx = vx / length
+                    ny = -vy / length
+                    
+                    # Ajustar la dirección según el tipo de curva
+                    curve_strength = length * 0.3  # Ajusta la curvatura
+                    
+                    # Invertimos la lógica para Cerrado/Abierto
+                    if corner['curve_type'] == 'Abierto':  # Convexo
+                        nx = -nx
+                        ny = -ny
+                    
+                    # Calcular el punto de control
+                    control_x = mid_x + nx * curve_strength
+                    control_y = mid_y + ny * curve_strength
+                    
+                    # Crear la curva con múltiples puntos
+                    t_values = np.linspace(0, 1, 20)
+                    curve_x = []
+                    curve_y = []
+                    
+                    for t in t_values:
+                        # Fórmula para una curva cuadrática de Bézier
+                        x = (1-t)**2 * corner['x_start'] + 2*(1-t)*t * control_x + t**2 * corner['x_end']
+                        y = (1-t)**2 * corner['y_start'] + 2*(1-t)*t * control_y + t**2 * corner['y_end']
+                        curve_x.append(x)
+                        curve_y.append(y)
+                    
+                    # Invertir coordenadas X para Plotly
+                    curve_x = [invert_x(x) for x in curve_x]
+                    
+                    # Añadir la curva interactiva
+                    plotly_fig.add_trace(go.Scatter(
+                        x=curve_x,
+                        y=curve_y,
+                        mode='lines',
+                        line=dict(color=corner['color'], width=10),
+                        opacity=0,                                    # Invisible pero detecta hover
+                        hoverinfo='text',
+                        hovertext=hover_text,
+                        showlegend=False
+                    ))
+                else:
+                    # Si la longitud es cero, usar línea recta
+                    plotly_fig.add_trace(go.Scatter(
+                        x=[invert_x(corner['x_start']), invert_x(corner['x_end'])],
+                        y=[corner['y_start'], corner['y_end']],
+                        mode='lines',
+                        line=dict(color=corner['color'], width=10),
+                        opacity=0,
+                        hoverinfo='text',
+                        hovertext=hover_text,
+                        showlegend=False
+                    ))
+            else:
+                # Línea recta para el córner (invisible pero detecta hover) con eje X invertido
+                plotly_fig.add_trace(go.Scatter(
+                    x=[invert_x(corner['x_start']), invert_x(corner['x_end'])],
+                    y=[corner['y_start'], corner['y_end']],
+                    mode='lines',
+                    line=dict(color=corner['color'], width=10),
+                    opacity=0,
+                    hoverinfo='text',
+                    hovertext=hover_text,
+                    showlegend=False
+                ))
+            
+            # Punto para el origen (invisible pero detecta hover) con eje X invertido
+            plotly_fig.add_trace(go.Scatter(
+                x=[invert_x(corner['x_start'])],
+                y=[corner['y_start']],
+                mode='markers',
+                marker=dict(size=10, color=corner['color']),
+                opacity=0,
+                hoverinfo='text',
+                hovertext=hover_text,
+                showlegend=False
+            ))
+        
+        # PASO 5: Configurar el layout para que se ajuste a la imagen
+        aspect_ratio = height / width
+        
+        plotly_fig.update_layout(
+            autosize=True,
+            height=700,
+            margin=dict(l=0, r=0, t=0, b=0),
+            paper_bgcolor='rgba(0,0,0,0)',
+            plot_bgcolor='rgba(0,0,0,0)',
+            xaxis=dict(
+                visible=False,
+                range=[0, 100],
+                fixedrange=True
+            ),
+            yaxis=dict(
+                visible=False,
+                range=[0, 100],
+                scaleanchor="x",
+                scaleratio=aspect_ratio,
+                fixedrange=True
+            ),
+            showlegend=False,
+            hovermode='closest'
+        )
+        
+        # Devolver el gráfico interactivo
+        return dcc.Graph(
+            figure=plotly_fig,
+            config={'displayModeBar': False},  # Ocultar la barra de herramientas de Plotly
+            style={'width': '100%', 'height': '100%'}
+        )
+        
     except Exception as e:
         print(f"Error al crear el campograma: {str(e)}")
         return html.Div(f"Error al crear el campograma: {str(e)}", 
                        className="text-center text-danger my-3")
 
-# Función para integrar el campograma en la visualización principal
-def create_corner_visualization(df_corners, selected_players, selected_descriptions):
-    """
-    Crea una visualización interactiva del desempeño en córners
-    
-    Args:
-        df_corners (DataFrame): Datos filtrados de córners
-        selected_players (list): Jugadores seleccionados
-        selected_descriptions (list): Descripciones seleccionadas
-        
-    Returns:
-        html.Div: Contenedor con la visualización
-    """
-    if df_corners.empty:
-        return html.Div([
-            html.H4("No hay datos disponibles con los filtros seleccionados", 
-                   className="text-center text-muted my-5")
-        ])
-    
-    # Título descriptivo
-    title_parts = []
-    if selected_players:
-        title_parts.append(f"Jugadores: {', '.join(selected_players)}")
-    if selected_descriptions:
-        title_parts.append(f"Descripciones: {', '.join(selected_descriptions)}")
-    
-    title = "Análisis de córners"
-    if title_parts:
-        title += " - " + " | ".join(title_parts)
-    
-    # Agrupar córners por ID para análisis
-    corner_ids = df_corners['id'].unique()
-    
-    # Preparar datos para la visualización
-    corner_data = []
-    
-    for corner_id in corner_ids:
-        corner_info = {}
-        corner_records = df_corners[df_corners['id'] == corner_id]
-        
-        # Datos básicos
-        first_record = corner_records.iloc[0]
-        corner_info['id'] = corner_id
-        corner_info['player'] = first_record['player']
-        corner_info['descripcion'] = first_record['descripcion']
-        corner_info['minute'] = first_record['minute']
-        
-        # Extraer coordenadas si están disponibles
-        if 'xStart' in first_record and 'yStart' in first_record:
-            corner_info['xStart'] = first_record['xStart']
-            corner_info['yStart'] = first_record['yStart']
-        
-        if 'xEnd' in first_record and 'yEnd' in first_record:
-            corner_info['xEnd'] = first_record['xEnd']
-            corner_info['yEnd'] = first_record['yEnd']
-        
-        # Extraer atributos específicos
-        for _, record in corner_records.iterrows():
-            if record['idgroup'] == 'Lado':
-                corner_info['side'] = record['idtext']
-            elif record['idgroup'] == 'Golpeo':
-                corner_info['kick_type'] = record['idtext']
-            elif record['idgroup'] == 'Tipo defensa':
-                corner_info['defense_type'] = record['idtext']
-            elif record['idgroup'] == 'Caida lanzamiento':
-                corner_info['landing'] = record['idtext']
-            elif record['idgroup'] == 'Ocasión':
-                # Mapear valores de idtext a categorías de chance
-                occasion_text = record['idtext']
-                if occasion_text == 'Ocasión clarisima':
-                    corner_info['chance'] = 'Alta'
-                elif occasion_text == 'Ocasión Clara':
-                    corner_info['chance'] = 'Media'
-                elif occasion_text == 'Remate sin importancia':
-                    corner_info['chance'] = 'Leve'
-                elif occasion_text == 'Sin ocasión':
-                    corner_info['chance'] = 'Sin ocasión'
-                else:
-                    corner_info['chance'] = occasion_text
-        
-        corner_data.append(corner_info)
-    
-    # Convertir a DataFrame para análisis
-    df_corner_analysis = pd.DataFrame(corner_data)
-    
-    # Crear visualizaciones
-    
-    # 1. Gráfico de efectividad (ocasiones generadas)
-    if 'chance' in df_corner_analysis.columns:
-        chance_counts = df_corner_analysis['chance'].value_counts().reset_index()
-        chance_fig = px.pie(
-            chance_counts,
-            values='count',
-            names='chance',
-            title='Ocasiones generadas',
-            hole=0.4,
-            color_discrete_sequence=px.colors.qualitative.Pastel
-        )
-        chance_fig.update_traces(textposition='inside', textinfo='percent+label')
-    else:
-        chance_fig = None
-    
-    # Crear componente con las visualizaciones
-    viz_components = []
-    
-    # Añadir título
-    viz_components.append(html.H4(title, className="mb-4"))
-    
-    # Añadir gráfico de pizza y campograma lado a lado
-    row_children = []
-    
-    # Columna para el gráfico de pizza
-    if chance_fig:
-        row_children.append(dbc.Col(dcc.Graph(figure=chance_fig), md=6))
-    
-    # Columna para el campograma
-    row_children.append(dbc.Col(create_corner_pitch_visualization(df_corner_analysis), md=6))
-    
-    viz_components.append(dbc.Row(row_children, className="mb-4"))
-    
-    # Añadir tabla resumen si hay pocos datos
-    if len(df_corner_analysis) <= 20:
-        viz_components.append(create_corners_table(df_corner_analysis))
-    
-    return html.Div(viz_components)
