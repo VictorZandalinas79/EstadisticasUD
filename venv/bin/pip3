@@ -1,4 +1,4 @@
-#!/Users/imac/Programas/Tareas_master_Python_avanzado/M9/tarea/venv/bin/python3.12
+#!/Users/victorzandal/Proyectos/EstadisticasUDAtzeneta/EstadisticasUD/venv/bin/python3.11
 # -*- coding: utf-8 -*-
 import re
 import sys
