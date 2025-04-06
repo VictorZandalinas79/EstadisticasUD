@@ -44,7 +44,7 @@ try:
         from pages.home import home_layout, register_home_callbacks, format_evolution_table, get_color_scale, get_color_scale_ocasiones, generar_analisis_kpis
         from pages.corners import corners_layout, register_corners_callbacks
         from pages.faltas import faltas_layout, register_faltas_callbacks
-        from pages.momentosjuego import momentosjuego_layout, register_momentosjuego_callbacks
+        from pages.estadisticaspartidos import estadisticaspartidos_layout, register_estadisticaspartidos_callbacks
         from utils.database import get_all_matches_data, get_dummy_match_data
         
         # Configurar sistema de login
@@ -84,7 +84,7 @@ try:
                             dbc.NavItem(dbc.NavLink("Inicio", href="/")),
                             dbc.NavItem(dbc.NavLink("Corners", href="/corners")),
                             dbc.NavItem(dbc.NavLink("Faltas", href="/faltas")),
-                            dbc.NavItem(dbc.NavLink("Momentos de Juego", href="/momentosjuego")),
+                            dbc.NavItem(dbc.NavLink("Estadisticas Partidos", href="/estadisticaspartidos")),
                             dbc.NavItem(dbc.NavLink("Cerrar Sesión", href="/logout")),
                         ], className="ms-auto", navbar=True),
                         id="navbar-collapse",
@@ -136,10 +136,10 @@ try:
                     create_navbar(),
                     faltas_layout(),
                 ])
-            elif pathname == '/momentosjuego':
+            elif pathname == '/estadisticaspartidos':
                 return html.Div([
                     create_navbar(),
-                    momentosjuego_layout(),
+                    estadisticaspartidos_layout(),
                 ])
             else:  # Home o cualquier otra ruta
                 return html.Div([
@@ -226,7 +226,7 @@ try:
         # Registrar callbacks específicos de cada página
         register_corners_callbacks(app)
         register_faltas_callbacks(app)
-        register_momentosjuego_callbacks(app)
+        register_estadisticaspartidos_callbacks(app)
         
     except ImportError as e:
         print(f"Error al importar módulos de la aplicación: {e}")

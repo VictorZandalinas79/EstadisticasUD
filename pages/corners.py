@@ -94,63 +94,40 @@ def corners_layout():
 
 # Función para obtener datos de córners con filtros
 def get_filtered_corners_data(players=None, descriptions=None):
-    """
-    Obtiene datos de córners de la base de datos MySQL con filtros
-    
-    Args:
-        players (list): Lista de jugadores a filtrar
-        descriptions (list): Lista de descripciones (partidos) a filtrar
-        
-    Returns:
-        pandas.DataFrame: DataFrame con los datos de córners filtrados
-    """
     try:
-        # Conectar a la base de datos
         conn = mysql.connector.connect(**DB_CONFIG)
         cursor = conn.cursor(dictionary=True)
         
-        # Construir la consulta SQL base - AÑADIR xStart, yStart, xEnd, yEnd a la consulta
+        # Seleccionar solo las columnas necesarias
         query = """
-        SELECT ID as id, idcode, player, team, idgroup, idtext, secundary, descripcion, mins as minute,
-               xStart, yStart, xEnd, yEnd
+        SELECT ID as id, idcode, player, team, idgroup, idtext, secundary, 
+               descripcion, mins as minute, xStart, yStart, xEnd, yEnd
         FROM bot_events 
-        WHERE idcode = 'Corner'
+        WHERE idcode = 'Corner' AND team = 'UD Atzeneta'
         """
         
-        # Añadir condiciones de filtro si existen
-        conditions = []
+        # Construir condiciones de filtro más eficientes
         params = []
-        
-        # Siempre filtrar por equipo UD Atzeneta
-        conditions.append("team = 'UD Atzeneta'")
         
         if players and len(players) > 0 and 'all' not in players:
             placeholders = ', '.join(['%s'] * len(players))
-            conditions.append(f"player IN ({placeholders})")
+            query += f" AND player IN ({placeholders})"
             params.extend(players)
             
         if descriptions and len(descriptions) > 0 and 'all' not in descriptions:
             placeholders = ', '.join(['%s'] * len(descriptions))
-            conditions.append(f"descripcion IN ({placeholders})")
+            query += f" AND descripcion IN ({placeholders})"
             params.extend(descriptions)
-            
-        if conditions:
-            query += " AND " + " AND ".join(conditions)
         
-        # Ejecutar la consulta
+        # Añadir un límite para evitar cargar demasiados datos
+        query += " LIMIT 500"
+        
         cursor.execute(query, params)
-        
-        # Obtener todos los resultados
         results = cursor.fetchall()
-        
-        # Cerrar la conexión
         cursor.close()
         conn.close()
         
-        # Convertir a DataFrame de pandas
-        df = pd.DataFrame(results)
-        
-        return df
+        return pd.DataFrame(results)
         
     except Exception as e:
         print(f"Error al obtener datos de córners: {str(e)}")

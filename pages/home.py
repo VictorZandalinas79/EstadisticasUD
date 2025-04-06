@@ -64,10 +64,10 @@ def home_layout():
                                     dbc.Card([
                                         dbc.CardBody([
                                             html.Img(src="/assets/momentos_juego.jpg", height="120px", className="mx-auto d-block mb-3"),
-                                            html.H4("Momentos de Juego", className="text-center m-0 fw-bold"),
+                                            html.H4("Estadisticas de Partidos", className="text-center m-0 fw-bold"),
                                         ], className="d-flex flex-column align-items-center justify-content-center h-100")
                                     ], className="h-100 shadow text-center", color="light", style={"cursor": "pointer", "transition": "transform 0.2s", ":hover": {"transform": "scale(1.05)"}})
-                                , href="/momentosjuego", className="text-decoration-none d-block h-100")
+                                , href="/estadisticaspartidos", className="text-decoration-none d-block h-100")
                             ], md=4, className="mb-3"),
                         ], className="g-4")
                     ])
@@ -95,7 +95,7 @@ def home_layout():
         dbc.Row([
             dbc.Col([
                 dbc.Card([
-                    dbc.CardHeader(html.H5("Evolución por Partido", className="m-0")),
+                    dbc.CardHeader(html.H5("Evolución por Partido - KPI´s", className="m-0")),
                     dbc.CardBody([
                         html.Div([
                             # La tabla se cargará mediante callback
@@ -150,7 +150,7 @@ def home_layout():
         dbc.Row([
             dbc.Col([
                 dbc.Card([
-                    dbc.CardHeader(html.H5("Análisis Automático", className="m-0")),
+                    dbc.CardHeader(html.H5("Análisis Automático - KPI", className="m-0")),
                     dbc.CardBody([
                         dcc.Loading(
                             id="loading-analysis",
