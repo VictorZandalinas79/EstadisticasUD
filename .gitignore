@@ -1,0 +1,10 @@
+# Ignorar archivos de credenciales
+credentials/
+*.env
+config.ini
+
+# Ignorar archivos temporales
+__pycache__/
+*.pyc
+.DS_Store
+
