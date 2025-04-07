@@ -15,6 +15,23 @@ from datetime import datetime
 import os
 import json
 
+# Añade esta función al principio de tu archivo para depuración
+def imprimir_estructura_df(df, nombre="DataFrame"):
+    """Imprime información detallada sobre un DataFrame para depuración"""
+    print(f"\n--- DEPURACIÓN DE {nombre} ---")
+    print(f"Dimensiones: {df.shape}")
+    print(f"Columnas: {df.columns.tolist()}")
+    print(f"Tipos de datos:\n{df.dtypes}")
+    
+    if 'Jornada' in df.columns:
+        print(f"\nValores únicos en Jornada: {df['Jornada'].unique().tolist()}")
+        # Mostrar los primeros valores con su tipo de dato
+        print("\nPrimeros valores de Jornada con tipo:")
+        for val in df['Jornada'].head(5):
+            print(f"  {val} ({type(val)})")
+    
+    print("-----------------------------\n")
+
 # Función para obtener datos de Google Sheets
 def get_sheet_data(sheet_name):
     """
@@ -24,7 +41,7 @@ def get_sheet_data(sheet_name):
         sheet_name (str): Nombre de la hoja dentro del documento de Google Sheets
         
     Returns:
-        pandas.DataFrame: DataFrame con los datos de la hoja
+        pandas.DataFrame: DataFrame con los datos de la hoja, limitado a las columnas relevantes
     """
     try:
         # Define el alcance y credenciales
@@ -101,18 +118,40 @@ def get_sheet_data(sheet_name):
             # Crear DataFrame directamente con los valores y los encabezados corregidos
             df = pd.DataFrame(data_rows, columns=fixed_headers)
             
-            # Convertir las columnas numéricas
-            numeric_columns = ['Dorsal', 'Tiempo', 'GF', 'GC', 'Asist', 'TA', 'TR', 'Jornada']
-            for col in numeric_columns:
-                if col in df.columns:
-                    df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
+            # Determinar las columnas relevantes - solo hasta TR
+            columnas_relevantes = ['Jornada', 'Dorsal', 'Jugador', 'Posicion', 'Tiempo', 'Titular', 'GF', 'GC', 'Asist', 'TA', 'TR']
             
-            print(f"DataFrame creado con {len(df)} filas y {len(df.columns)} columnas")
+            # Filtrar para mantener solo las columnas relevantes que existen en el DataFrame
+            columnas_existentes = [col for col in columnas_relevantes if col in df.columns]
+            
+            # Crear un nuevo DataFrame con solo las columnas relevantes
+            df_filtrado = df[columnas_existentes].copy()
+            
+            print(f"DataFrame filtrado a {len(columnas_existentes)} columnas: {columnas_existentes}")
+            
+            # Convertir las columnas numéricas
+            numeric_columns = ['Dorsal', 'Tiempo', 'GF', 'GC', 'Asist', 'TA', 'TR']
+            for col in numeric_columns:
+                if col in df_filtrado.columns:
+                    df_filtrado[col] = pd.to_numeric(df_filtrado[col], errors='coerce').fillna(0)
+            
+            # Procesar la columna Jornada para extraer Competición
+            if 'Jornada' in df_filtrado.columns:
+                # Asegurar que sea string
+                df_filtrado['Jornada'] = df_filtrado['Jornada'].astype(str)
+                
+                # Extraer la primera letra como Competición
+                df_filtrado['Competicion'] = df_filtrado['Jornada'].str[0]
+                
+                print(f"Valores únicos en Jornada: {df_filtrado['Jornada'].unique().tolist()}")
+                print(f"Valores únicos en Competicion: {df_filtrado['Competicion'].unique().tolist()}")
+            
+            print(f"DataFrame final con {len(df_filtrado)} filas y {len(df_filtrado.columns)} columnas")
             
             # Añadir timestamp para verificar cuándo se actualizaron los datos
             print(f"Datos actualizados de Google Sheets (hoja: {sheet_name}) a las {datetime.now().strftime('%H:%M:%S')}")
             
-            return df
+            return df_filtrado
             
         except gspread.exceptions.SpreadsheetNotFound:
             print(f"No se encontró la hoja de cálculo con ID: {sheet_id}")
@@ -162,17 +201,17 @@ def estadisticaspartidos_layout():
                 dbc.Col([
                     html.Div([
                         html.H5("Filtros", className="mb-2"),
-                        html.Label("Jornada:"),
+                        html.Label("Competición:"),
                         dcc.Dropdown(
-                            id='jornada-dropdown',
+                            id='competicion-dropdown',
                             options=[{'label': 'Todas', 'value': 'todas'}],  # Se actualizará dinámicamente
                             value='todas',
                             clearable=False,
                             className="mb-3"
                         ),
-                        html.Label("Posición:"),
+                        html.Label("Jornada:"),
                         dcc.Dropdown(
-                            id='posicion-dropdown',
+                            id='jornada-dropdown',
                             options=[{'label': 'Todas', 'value': 'todas'}],  # Se actualizará dinámicamente
                             value='todas',
                             clearable=False,
@@ -275,7 +314,8 @@ def estadisticaspartidos_layout():
         ], fluid=True)
     ])
 
-# Registrar callbacks
+# --- FUNCIÓN REGISTER_ESTADISTICASPARTIDOS_CALLBACKS ---
+
 def register_estadisticaspartidos_callbacks(app):
     """
     Función para registrar los callbacks específicos de esta página
@@ -286,40 +326,35 @@ def register_estadisticaspartidos_callbacks(app):
         Output('stored-estadisticas-data', 'data'),
         [Input('interval-estadisticas', 'n_intervals'),
          Input('actualizar-datos-btn', 'n_clicks'),
-         Input('sheet-dropdown', 'value')]  # Añadido para seleccionar la hoja
+         Input('sheet-dropdown', 'value')]
     )
     def cargar_datos_estadisticas(n_intervals, n_clicks, selected_sheet):
         """Carga datos de Google Sheets"""
+        # Este callback no necesita cambios
         timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         
-        # Si no se seleccionó ninguna hoja, usar una por defecto
         if not selected_sheet:
-            selected_sheet = 'Jugadores Estadisticas'  # Reemplaza con el nombre real de tu hoja
+            selected_sheet = 'Jugadores Estadisticas'
             
         try:
-            # Obtener datos de Google Sheets - usar el nombre de la hoja seleccionada
             df = get_sheet_data(selected_sheet)
             
             if df.empty:
-                # Si no hay datos, mostrar mensaje de error
                 return {
                     'data': [], 
                     'timestamp': timestamp,
                     'error': f'No se pudieron obtener datos de la hoja "{selected_sheet}". Por favor, verifica la conexión y el nombre de la hoja.'
                 }
             
-            # Convertir las columnas numéricas
             numeric_columns = ['Dorsal', 'Tiempo', 'GF', 'GC', 'Asist', 'TA', 'TR']
             for col in numeric_columns:
                 if col in df.columns:
                     df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
             
-            # Convertir DataFrame a diccionario para almacenar en dcc.Store
             return {'data': df.to_dict('records'), 'timestamp': timestamp, 'error': None}
             
         except Exception as e:
             print(f"Error al cargar datos: {e}")
-            # En caso de error, devolver mensaje específico
             return {
                 'data': [], 
                 'timestamp': timestamp,
@@ -328,15 +363,15 @@ def register_estadisticaspartidos_callbacks(app):
     
     # Callback para actualizar las opciones de filtro basadas en los datos
     @app.callback(
-        [Output('jornada-dropdown', 'options'),
-         Output('posicion-dropdown', 'options'),
+        [Output('competicion-dropdown', 'options'),
+         Output('jornada-dropdown', 'options'),
          Output('jugador-dropdown', 'options')],
-        [Input('stored-estadisticas-data', 'data')]
+        [Input('stored-estadisticas-data', 'data'),
+         Input('competicion-dropdown', 'value')]
     )
-    def actualizar_opciones_filtro(stored_data):
+    def actualizar_opciones_filtro(stored_data, competicion_seleccionada):
         """Actualiza las opciones de filtro basadas en los datos cargados"""
         if not stored_data or stored_data.get('error') or not stored_data.get('data'):
-            # Valores por defecto si no hay datos
             return (
                 [{'label': 'Todas', 'value': 'todas'}],
                 [{'label': 'Todas', 'value': 'todas'}],
@@ -346,25 +381,88 @@ def register_estadisticaspartidos_callbacks(app):
         try:
             df = pd.DataFrame(stored_data['data'])
             
-            # Obtener valores únicos para cada filtro
-            # Verificar que las columnas existen antes de obtener valores únicos
-            jornadas = [{'label': 'Todas', 'value': 'todas'}]
+            # --- Procesar las competiciones ---
+            competiciones = [{'label': 'Todas', 'value': 'todas'}]
+            
+            # Extraer la letra de competición de la columna Jornada
             if 'Jornada' in df.columns:
-                jornadas.extend([{'label': str(j), 'value': str(j)} for j in sorted(df['Jornada'].unique())])
+                # Asegurarse de que Jornada es string
+                df['Jornada'] = df['Jornada'].astype(str)
+                
+                # Extraer la primera letra de cada jornada
+                df['Competicion'] = df['Jornada'].str[0]
+                
+                # Mapear códigos a nombres completos
+                competicion_map = {
+                    'J': 'Liga',
+                    'A': 'Amistoso',
+                    'C': 'Copa'
+                }
+                
+                # Obtener competiciones únicas
+                comp_unicas = df['Competicion'].unique()
+                competiciones.extend([
+                    {'label': competicion_map.get(c, c), 'value': c} 
+                    for c in sorted(comp_unicas)
+                ])
             
-            posiciones = [{'label': 'Todas', 'value': 'todas'}]
-            if 'Posicion' in df.columns:
-                posiciones.extend([{'label': p, 'value': p} for p in sorted(df['Posicion'].unique())])
+            # --- Procesar las jornadas ---
+            jornadas = [{'label': 'Todas', 'value': 'todas'}]
+
+            if 'Jornada' in df.columns:
+                # Asegurarse de que Jornada es string
+                df['Jornada'] = df['Jornada'].astype(str)
+                
+                # Limpieza de datos de jornada (eliminar duplicaciones)
+                # Usar una expresión regular para extraer el patrón de letra+número
+                import re
+                
+                def limpiar_jornada(jornada_texto):
+                    """Limpia los valores de jornada para asegurar el formato letra+número correcto"""
+                    # Convertir a string si no lo es
+                    jornada_texto = str(jornada_texto)
+                    # Busca patrones como A1, J2, C3, etc.
+                    match = re.match(r'([A-Z])(\d+)', jornada_texto)
+                    if match:
+                        return match.group(0)  # Devuelve el primer patrón encontrado
+                    return jornada_texto  # Si no hay patrón, devuelve el texto original
+                
+                # Aplicar la limpieza a la columna de jornada
+                df['Jornada_Limpia'] = df['Jornada'].apply(limpiar_jornada)
+                
+                # Sobreescribir la columna original con los valores limpios
+                df['Jornada'] = df['Jornada_Limpia']
+                df.drop('Jornada_Limpia', axis=1, inplace=True)
+                
+                # Actualizar la columna de competición basada en la jornada limpia
+                df['Competicion'] = df['Jornada'].str[0]
+                
+                # Filtrar por competición si se ha seleccionado una específica
+                if competicion_seleccionada != 'todas':
+                    df_filtrado = df[df['Competicion'] == competicion_seleccionada]
+                else:
+                    df_filtrado = df
+                
+                # Obtener jornadas únicas
+                jornadas_unicas = sorted(df_filtrado['Jornada'].unique())
+                
+                # Crear las opciones para el dropdown de jornadas
+                jornadas.extend([{'label': str(j), 'value': str(j)} for j in jornadas_unicas])
             
+            # --- Procesar los jugadores ---
             jugadores = [{'label': 'Todos', 'value': 'todos'}]
+            
             if 'Jugador' in df.columns:
                 if 'Dorsal' in df.columns:
-                    jugadores.extend([{'label': f"{j} ({d})", 'value': j} for j, d in 
-                                     zip(df['Jugador'].unique(), df.groupby('Jugador')['Dorsal'].first().values)])
+                    # Incluir dorsales si están disponibles
+                    jugadores.extend([
+                        {'label': f"{j} ({d})", 'value': j} 
+                        for j, d in zip(df['Jugador'].unique(), df.groupby('Jugador')['Dorsal'].first().values)
+                    ])
                 else:
                     jugadores.extend([{'label': j, 'value': j} for j in sorted(df['Jugador'].unique())])
             
-            return jornadas, posiciones, jugadores
+            return competiciones, jornadas, jugadores
             
         except Exception as e:
             print(f"Error al actualizar opciones de filtro: {e}")
@@ -379,11 +477,11 @@ def register_estadisticaspartidos_callbacks(app):
         [Output('tabla-estadisticas-container', 'children'),
          Output('actualizacion-info', 'children')],
         [Input('stored-estadisticas-data', 'data'),
+         Input('competicion-dropdown', 'value'),
          Input('jornada-dropdown', 'value'),
-         Input('posicion-dropdown', 'value'),
          Input('jugador-dropdown', 'value')]
     )
-    def actualizar_tabla_estadisticas(stored_data, jornada, posicion, jugador):
+    def actualizar_tabla_estadisticas(stored_data, competicion, jornada, jugador):
         """Actualiza la tabla de estadísticas con los datos almacenados y filtrados"""
         if not stored_data:
             return html.Div("No hay datos disponibles."), ""
@@ -404,12 +502,17 @@ def register_estadisticaspartidos_callbacks(app):
         
         df = pd.DataFrame(stored_data['data'])
         
-        # Aplicar filtros si las columnas existen
+        # Extraer información de competición si tenemos jornadas
+        if 'Jornada' in df.columns:
+            df['Jornada'] = df['Jornada'].astype(str)
+            df['Competicion'] = df['Jornada'].str[0]
+        
+        # Aplicar filtros
+        if competicion != 'todas' and 'Competicion' in df.columns:
+            df = df[df['Competicion'] == competicion]
+        
         if jornada != 'todas' and 'Jornada' in df.columns:
             df = df[df['Jornada'].astype(str) == jornada]
-        
-        if posicion != 'todas' and 'Posicion' in df.columns:
-            df = df[df['Posicion'] == posicion]
         
         if jugador != 'todos' and 'Jugador' in df.columns:
             df = df[df['Jugador'] == jugador]
@@ -485,11 +588,11 @@ def register_estadisticaspartidos_callbacks(app):
         [Input('stored-estadisticas-data', 'data'),
          Input('estadistica-visualizar-dropdown', 'value'),
          Input('tipo-grafico-dropdown', 'value'),
+         Input('competicion-dropdown', 'value'),
          Input('jornada-dropdown', 'value'),
-         Input('posicion-dropdown', 'value'),
          Input('jugador-dropdown', 'value')]
     )
-    def actualizar_grafico_estadisticas(stored_data, estadistica, tipo_grafico, jornada, posicion, jugador):
+    def actualizar_grafico_estadisticas(stored_data, estadistica, tipo_grafico, competicion, jornada, jugador):
         """Actualiza el gráfico basado en la estadística seleccionada, tipo de gráfico y filtros"""
         # Verificar si hay datos válidos
         if (not stored_data or 
@@ -522,6 +625,11 @@ def register_estadisticaspartidos_callbacks(app):
         
         df = pd.DataFrame(stored_data['data'])
         
+        # Extraer información de competición si tenemos jornadas
+        if 'Jornada' in df.columns:
+            df['Jornada'] = df['Jornada'].astype(str)
+            df['Competicion'] = df['Jornada'].str[0]
+        
         # Verificar si la estadística seleccionada existe en los datos
         if estadistica not in df.columns:
             return go.Figure().update_layout(
@@ -539,12 +647,12 @@ def register_estadisticaspartidos_callbacks(app):
                 ]
             )
         
-        # Aplicar filtros si las columnas existen
+        # Aplicar filtros
+        if competicion != 'todas' and 'Competicion' in df.columns:
+            df = df[df['Competicion'] == competicion]
+        
         if jornada != 'todas' and 'Jornada' in df.columns:
             df = df[df['Jornada'].astype(str) == jornada]
-        
-        if posicion != 'todas' and 'Posicion' in df.columns:
-            df = df[df['Posicion'] == posicion]
         
         if jugador != 'todos' and 'Jugador' in df.columns:
             df = df[df['Jugador'] == jugador]
@@ -575,10 +683,10 @@ def register_estadisticaspartidos_callbacks(app):
                 # Si es un jugador específico, mostrar por jornada
                 x_axis = 'Jornada'
                 title = f"{estadistica} de {jugador} por Jornada"
-            elif posicion != 'todas' and 'Jugador' in df.columns:
-                # Si es por posición, mostrar por jugador
+            elif 'Posicion' in df.columns and 'Jugador' in df.columns:
+                # Si hay posición disponible, mostrar por jugador
                 x_axis = 'Jugador'
-                title = f"{estadistica} por Jugador en posición {posicion}"
+                title = f"{estadistica} por Jugador"
             elif jornada != 'todas' and 'Jugador' in df.columns:
                 # Si es por jornada, mostrar por jugador
                 x_axis = 'Jugador'
@@ -769,11 +877,11 @@ def register_estadisticaspartidos_callbacks(app):
     @app.callback(
         Output('resumen-estadisticas', 'children'),
         [Input('stored-estadisticas-data', 'data'),
+         Input('competicion-dropdown', 'value'),
          Input('jornada-dropdown', 'value'),
-         Input('posicion-dropdown', 'value'),
          Input('jugador-dropdown', 'value')]
     )
-    def actualizar_resumen_estadisticas(stored_data, jornada, posicion, jugador):
+    def actualizar_resumen_estadisticas(stored_data, competicion, jornada, jugador):
         """Genera un resumen de estadísticas basado en los datos y filtros aplicados"""
         if not stored_data or stored_data.get('error') or not stored_data.get('data'):
             return html.Div(className="alert alert-warning", children=[
@@ -784,12 +892,17 @@ def register_estadisticaspartidos_callbacks(app):
         try:
             df = pd.DataFrame(stored_data['data'])
             
-            # Aplicar filtros si las columnas existen
+            # Extraer información de competición si tenemos jornadas
+            if 'Jornada' in df.columns:
+                df['Jornada'] = df['Jornada'].astype(str)
+                df['Competicion'] = df['Jornada'].str[0]
+            
+            # Aplicar filtros
+            if competicion != 'todas' and 'Competicion' in df.columns:
+                df = df[df['Competicion'] == competicion]
+            
             if jornada != 'todas' and 'Jornada' in df.columns:
                 df = df[df['Jornada'].astype(str) == jornada]
-            
-            if posicion != 'todas' and 'Posicion' in df.columns:
-                df = df[df['Posicion'] == posicion]
             
             if jugador != 'todos' and 'Jugador' in df.columns:
                 df = df[df['Jugador'] == jugador]
