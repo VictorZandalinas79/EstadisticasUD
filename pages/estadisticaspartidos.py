@@ -47,23 +47,35 @@ def get_sheet_data(sheet_name):
         # Define el alcance y credenciales
         scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
         
-        # Ruta al archivo de credenciales
-        credentials_path = os.path.join(os.path.dirname(__file__), '..', 'credentials', 'google_credentials.json')
+        # Verificar si hay variable de entorno para credenciales
+        import os
+        import json
+        from tempfile import NamedTemporaryFile
         
-        # Si no existe el directorio, crearlo
-        credentials_dir = os.path.join(os.path.dirname(__file__), '..', 'credentials')
-        if not os.path.exists(credentials_dir):
-            os.makedirs(credentials_dir)
+        credentials_json = os.environ.get('GOOGLE_CREDENTIALS')
         
-        # Verificar si existe el archivo de credenciales
-        if not os.path.exists(credentials_path):
-            print(f"Error: No se encontró el archivo de credenciales en: {credentials_path}")
-            print("Por favor, crea el archivo de credenciales manualmente.")
-            # Devolver DataFrame vacío si no hay credenciales
-            return pd.DataFrame()
-        
-        # Cargar credenciales desde el archivo
-        credentials = ServiceAccountCredentials.from_json_keyfile_name(credentials_path, scope)
+        if credentials_json:
+            # Crear un archivo temporal con las credenciales
+            with NamedTemporaryFile(mode='w+', suffix='.json', delete=False) as temp:
+                temp.write(credentials_json)
+                temp_path = temp.name
+                
+            # Usar el archivo temporal
+            credentials = ServiceAccountCredentials.from_json_keyfile_name(temp_path, scope)
+            
+            # Eliminar el archivo temporal después de usarlo
+            os.unlink(temp_path)
+        else:
+            # Ruta al archivo de credenciales (fallback para desarrollo local)
+            credentials_path = os.path.join(os.path.dirname(__file__), '..', 'credentials', 'google_credentials.json')
+            
+            # Verificar si existe el archivo
+            if not os.path.exists(credentials_path):
+                print(f"Error: No se encontró el archivo de credenciales en: {credentials_path}")
+                print("Por favor, crea el archivo de credenciales manualmente.")
+                return pd.DataFrame()
+                
+            credentials = ServiceAccountCredentials.from_json_keyfile_name(credentials_path, scope)
         
         # Autorizar el cliente
         client = gspread.authorize(credentials)
